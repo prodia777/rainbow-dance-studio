@@ -189,7 +189,7 @@
     if (cancelled) return;
     setStep('motion', 1, '切替' + r.flips.length + '回');
     song = { name: name, buf: buf, ch: channelDb(buf), secs: (performance.now() - t) / 1000 };
-    base = b; res = r; playOff = 0;
+    base = b; res = r; playOff = 0; paused = false;
     var rec = (store('rs.recent.v1') || []).filter(function (x) { return x.name !== name; });
     rec.unshift({ name: name, dur: buf.duration, tempo: Math.round(r.tempo), flips: r.flips.length, sample: sampleFile || null });
     store('rs.recent.v1', rec.slice(0, 5)); renderRecent();
@@ -388,7 +388,7 @@
   window.addEventListener('resize', function () { if (cur === 'result') { sizeTimeline(); drawTimelineBase(); } });
 
   // ================= 再生とスタート信号（基板はシミュレーション） =================
-  var play = { on: false }, playOff = 0, wake = null;
+  var play = { on: false }, playOff = 0, wake = null, paused = false;   // paused＝一時停止中（曲の途中。基板の振付はそのまま）
   // 予約した時刻（音を出す処理の時刻）をスマホの時計に直す。ここにスピーカーの遅れを足した時刻に音が聞こえる
   function ctxToPerf(ct) { return performance.now() + (ct - ctx.currentTime) * 1000; }
   function startPlay() {
@@ -402,16 +402,16 @@
     var autoLat = (ac.outputLatency || ac.baseLatency || 0) * 1000, lat = Math.max(0, autoLat + S.spk);
     var sigPerf = ctxToPerf(when);
     play = { on: true, src: src, when: when, off: playOff, sigPerf: sigPerf, boardStart: sigPerf + lat, autoLat: autoLat, lat: lat, clickPerf: performance.now() };
-    src.onended = function () { if (play.src === src && play.on) { var endPos = audioPos(); if (endPos >= song.buf.duration - 0.2) { play.on = false; playOff = 0; setPlayIcon(false); $('chip-dir').textContent = '終了'; } } };
+    src.onended = function () { if (play.src === src && play.on) { var endPos = audioPos(); if (endPos >= song.buf.duration - 0.2) { play.on = false; playOff = 0; paused = false; setPlayIcon(false); $('chip-dir').textContent = '終了'; } } };
     $('sy-sig').textContent = '予約 ' + Math.round(lead * 1000) + ' ms後・' + fmt(playOff) + 'から';
     $('sy-lat').textContent = Math.round(autoLat) + (S.spk ? (S.spk > 0 ? ' + ' : ' − ') + Math.abs(S.spk) : '') + ' ms';
     setPlayIcon(true);
     try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () { }); } catch (e) { }
   }
   function stopPlay(reset) {
-    if (play.on) { playOff = Math.max(0, Math.min(song ? song.buf.duration : 0, audioPos())); try { play.src.stop(); } catch (e) { } }
+    if (play.on) { playOff = Math.max(0, Math.min(song ? song.buf.duration : 0, audioPos())); try { play.src.stop(); } catch (e) { } paused = true; }
+    if (reset) { playOff = 0; paused = false; }
     play.on = false; setPlayIcon(false);
-    if (reset) playOff = 0;
     if (wake) { try { wake.release(); } catch (e) { } wake = null; }
   }
   // いま聞こえている音の位置（端末が報告する「出力中の時刻」から求める）
@@ -423,9 +423,11 @@
   function boardPos(now) { return play.off + (now - play.boardStart) / 1000; }
   function setPlayIcon(on) {
     // 曲の途中は振付（基板へ転送済み）を変えられないようにする
-    document.querySelectorAll('[data-preset]').forEach(function (b) { b.disabled = on; });
-    $('btn-adjust').disabled = on;
-    $('preset-lock').hidden = !on;
+    // 一時停止中も同じ振付の続きから再開するので変更不可。STOP（曲の初めへ）か曲の終わりで解除
+    var lock = on || paused;
+    document.querySelectorAll('[data-preset]').forEach(function (b) { b.disabled = lock; });
+    $('btn-adjust').disabled = lock;
+    $('preset-lock').hidden = !lock;
     $('lbl-play').textContent = on ? 'PAUSE' : 'PLAY';
     $('btn-play').setAttribute('aria-pressed', on ? 'true' : 'false');
     $('ico-play').toggleAttribute('hidden', on); $('ico-pause').toggleAttribute('hidden', !on); $('btn-play').setAttribute('aria-label', on ? '一時停止（基板へ停止信号）' : '再生（基板へスタート信号）'); }
