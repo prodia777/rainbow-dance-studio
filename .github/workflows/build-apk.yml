@@ -3,7 +3,10 @@ name: Build Android APK
 on:
   push:
     branches: [ main ]
+    paths-ignore: [ 'apk/**' ]
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,3 +38,11 @@ jobs:
         with:
           name: RainbowDanceStudio-apk
           path: android/app/build/outputs/apk/**/*.apk
+      - name: できたAPKを builds ブランチに保存（Claudeが取りに行けるように）
+        run: |
+          mkdir -p /tmp/out && find android/app/build/outputs/apk -name '*.apk' -exec cp {} /tmp/out/ \;
+          git config user.name "github-actions"; git config user.email "github-actions@users.noreply.github.com"
+          git fetch origin builds:builds 2>/dev/null || true
+          git checkout --orphan tmp-builds && git rm -rqf --cached . && rm -rf ./* .github .gitignore 2>/dev/null || true
+          mkdir -p apk && cp /tmp/out/*.apk apk/ && echo "${{ github.sha }}" > apk/SOURCE_COMMIT.txt
+          git add apk && git commit -qm "APK build ${{ github.run_number }}" && git push -f origin HEAD:builds
