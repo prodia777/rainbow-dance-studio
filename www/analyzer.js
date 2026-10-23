@@ -291,6 +291,44 @@
     });
   }
 
+  // 一定のテンポで進む場面を見つけ、拍ごとにモーターをオン・オフしてリズムを刻む
+  // （オフの間は電気を切るだけ＝球体は惰性で回り続ける）
+  function rhythmSections(beatT, stage, flips, opts) {
+    if (!opts.rhythm || beatT.length < 10) return { segs: [], beats: [] };
+    var fps = 1000 / FRAME_MS, W = 8, steady = new Array(beatT.length).fill(false);
+    for (var i = 0; i + W < beatT.length; i++) {
+      var iv = []; for (var k = i; k < i + W; k++) iv.push(beatT[k + 1] - beatT[k]);
+      var m = iv.reduce(function (a, b) { return a + b; }, 0) / W;
+      var sd = Math.sqrt(iv.reduce(function (a, b) { return a + (b - m) * (b - m); }, 0) / W);
+      if (sd / m > opts.steadyCv || m < 0.25 || m > 1.1) continue;
+      var lively = true;
+      for (k = i; k <= i + W; k++) { var f = Math.floor(beatT[k] * fps); if (f >= stage.length || stage[f] < 2) { lively = false; break; } }
+      if (!lively) continue;
+      for (k = i; k <= i + W; k++) steady[k] = true;
+    }
+    for (i = 0; i < beatT.length; i++) for (var q = 0; q < flips.length; q++)
+      if (beatT[i] > flips[q].t - opts.reverseTime - 0.3 && beatT[i] < flips[q].t + 0.6) steady[i] = false;
+    var segs = [], beats = [], st = -1;
+    for (i = 0; i <= beatT.length; i++) {
+      if (i < beatT.length && steady[i]) { if (st < 0) st = i; continue; }
+      if (st >= 0 && i - st >= 8) {
+        segs.push({ t0: beatT[st], t1: beatT[i - 1] });
+        var iv0 = (beatT[i - 1] - beatT[st]) / (i - 1 - st), every = iv0 < 0.36 ? 2 : 1;   // 速い曲は2拍に1回
+        for (var b = st; b < i - 1; b += every) beats.push([beatT[b], beatT[Math.min(b + every, i - 1)]]);
+      }
+      st = -1;
+    }
+    return { segs: segs, beats: beats };
+  }
+
+  function applyRhythm(cmd, rb, duty) {
+    var fps = 1000 / FRAME_MS;
+    rb.beats.forEach(function (p) {
+      var on1 = p[0] + (p[1] - p[0]) * duty, a = Math.floor(on1 * fps), z = Math.floor((p[1] - 0.03) * fps);
+      for (var k = a; k < z && k < cmd.length; k++) cmd[k] = 0;      // 0＝電気を切る（惰性で回る）
+    });
+  }
+
   function applyPulses(cmd, pulses, amt) {
     var fps = 1000 / FRAME_MS, L = Math.round(0.16 * fps);
     pulses.forEach(function (t) {
@@ -303,7 +341,7 @@
     });
   }
 
-  function buildMotion(stage, flips, speed, revTime, motorLag, pulses, pulseAmt) {
+  function buildMotion(stage, flips, speed, revTime, motorLag, pulses, pulseAmt, rhythm, rhythmDuty) {
     var fps = 1000 / FRAME_MS, n = stage.length, mag = [0].concat(speed), cmd = new Float32Array(n), dir = 1, fi = 0;
     var flipF = flips.map(function (f) { return Math.floor(f.t * fps); });
     for (var i = 0; i < n; i++) { while (fi < flipF.length && flipF[fi] <= i) { dir = -dir; fi++; } cmd[i] = mag[stage[i]] * dir; }
@@ -315,6 +353,7 @@
       for (var k = a; k < z; k++) cmd[k] = before + (0 - before) * (k - a) / (z - a);
       for (k = z; k < f; k++) cmd[k] = after * (k - z) / (f - z);
     });
+    if (rhythm && rhythm.beats.length) applyRhythm(cmd, rhythm, rhythmDuty || 0.5);
     if (pulses && pulses.length) applyPulses(cmd, pulses, pulseAmt || 35);
     var tail = Math.min(n, fps);
     for (i = 0; i < tail; i++) cmd[n - tail + i] *= 1 - i / (tail - 1 || 1);
@@ -339,7 +378,7 @@
   }
 
   var DEFAULTS = { attack: 0.08, release: 0.35, th: [-1, 0.45, 0.75], speed: [55, 90, 127], minHold: 2.0,
-    reverseTime: 0.6, motorLag: 0.08, noveltyBeats: 16, noveltyDelta: 0.08, accents: true, accentPct: 99.7, pulses: true, pulsePct: 98.2, pulseAmt: 36, smooth: 1.0 };
+    reverseTime: 0.6, motorLag: 0.08, noveltyBeats: 16, noveltyDelta: 0.08, accents: true, accentPct: 99.7, pulses: true, pulsePct: 98.2, pulseAmt: 36, smooth: 1.0, rhythm: true, rhythmDuty: 0.5, steadyCv: 0.07 };
 
   // 重い処理（周波数分析・拍・曲調）は1回だけ。調整は remotion() で即座に作り直す
   async function analyze(pcm, sr, onStep) {
@@ -363,10 +402,14 @@
     base.level = level; base.levelKey = opts.attack + '/' + opts.release;
     var stage = toStages(level, opts.th, opts.minHold, opts.smooth);
     var mf = musicFlips(base.spect, base.beat.beats, stage, opts);
-    var pulses = pulseTimes(base.spect, mf.flips, stage, opts);
-    var cmd = buildMotion(stage, mf.flips, opts.speed, opts.reverseTime, opts.motorLag, pulses, opts.pulseAmt);
+    var rhythm = rhythmSections(mf.beatT, stage, mf.flips, opts);
+    var pulses = pulseTimes(base.spect, mf.flips, stage, opts).filter(function (t) {
+      for (var k = 0; k < rhythm.segs.length; k++) if (t >= rhythm.segs[k].t0 - 0.2 && t <= rhythm.segs[k].t1 + 0.2) return false;   // 刻む場面では弾まない
+      return true;
+    });
+    var cmd = buildMotion(stage, mf.flips, opts.speed, opts.reverseTime, opts.motorLag, pulses, opts.pulseAmt, rhythm, opts.rhythmDuty);
     var share = [0, 0, 0, 0]; for (var i = 0; i < stage.length; i++) share[stage[i]]++;
-    return { level: level, stage: stage, flips: mf.flips, pulses: pulses, beatT: mf.beatT, cmd: cmd, tempo: base.beat.tempo,
+    return { level: level, stage: stage, flips: mf.flips, pulses: pulses, rhythm: rhythm, beatT: mf.beatT, cmd: cmd, tempo: base.beat.tempo,
       share: share.map(function (v) { return v / stage.length; }), opts: opts };
   }
 

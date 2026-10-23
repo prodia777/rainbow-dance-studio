@@ -111,7 +111,12 @@ p{margin:0}
 .now{display:flex;flex-direction:column;gap:8px;min-width:0}
 .clock{font-family:var(--f-mono);font-size:30px;font-weight:700;line-height:1}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
-.playbtn{width:60px;height:60px;border-radius:30px;border:none;background:var(--amber);color:var(--amber-ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.playbtn{width:60px;height:60px;border-radius:30px;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;cursor:pointer}
+/* PLAY・STOP：演出ボタンと同じ物理スイッチ（押していない＝盛り上がり／押した・再生中＝緑に光る） */
+.phys{border:1px solid #4A4F58;border-bottom-color:#15171B;background:linear-gradient(180deg,#41454E 0%,#2D3036 55%,#25282D 100%);color:#E4E5E8;text-shadow:0 1px 0 rgba(0,0,0,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 5px 0 #0A0B0D,0 8px 12px rgba(0,0,0,.5);transform:translateY(0);transition:transform .08s,box-shadow .08s,background .15s;flex:none}
+.phys:hover:not([aria-pressed="true"]){background:linear-gradient(180deg,#4B505A 0%,#33363D 55%,#2A2D33 100%)}
+.phys:active,.phys[aria-pressed="true"]{background:radial-gradient(120% 90% at 50% 40%,#8CF7CF 0%,#4FE3A8 45%,#2FCB8C 100%);color:#062016;border-color:#7DF2C4;text-shadow:0 1px 0 rgba(255,255,255,.35);transform:translateY(4px);box-shadow:inset 0 0 10px rgba(255,255,255,.35),0 0 12px 2px rgba(52,211,153,.75),0 0 30px 8px rgba(52,211,153,.4),0 0 60px 16px rgba(52,211,153,.18)}
+.btn-lbl{font-family:var(--f-mono);font-size:9px;font-weight:700;letter-spacing:.08em;line-height:1}
 .sync{font-family:var(--f-mono);font-size:11px;line-height:1.55;color:var(--muted);background:#0f1013;border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;column-gap:12px}
 .sync b{color:var(--soft);font-weight:500;text-align:right}
 .tl{width:100%;height:120px;display:block;cursor:pointer;touch-action:manipulation}
@@ -139,6 +144,21 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 .recent-item .nm{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .recent-item .mt{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom, 0px));background:#2A2D33;color:var(--fg);padding:10px 16px;border-radius:12px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.5);z-index:20;max-width:calc(100% - 32px)}
+/* ---- 演出ボタン ---- */
+/* 物理スイッチ風：押していない＝凸（浮いている）、押した＝凹（沈み込む） */
+#preset{background:#0D0E11;border:1px solid #1E2025;border-radius:16px;padding:8px 8px 10px;gap:8px;box-shadow:inset 0 2px 6px rgba(0,0,0,.7)}
+#preset button{min-height:66px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px 4px;border:1px solid #4A4F58;border-bottom-color:#15171B;background:linear-gradient(180deg,#41454E 0%,#2D3036 55%,#25282D 100%);color:#E4E5E8;border-radius:12px;font-size:13px;font-weight:600;text-shadow:0 1px 0 rgba(0,0,0,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 5px 0 #0A0B0D,0 8px 12px rgba(0,0,0,.5);transform:translateY(0);transition:transform .08s,box-shadow .08s,background .15s}
+#preset button:hover:not(:disabled):not([aria-pressed="true"]){background:linear-gradient(180deg,#4B505A 0%,#33363D 55%,#2A2D33 100%)}
+#preset button:active:not(:disabled){background:radial-gradient(120% 90% at 50% 40%,#8CF7CF 0%,#4FE3A8 45%,#2FCB8C 100%);color:#062016;border-color:#7DF2C4;text-shadow:0 1px 0 rgba(255,255,255,.35);box-shadow:inset 0 0 10px rgba(255,255,255,.35),0 0 12px 2px rgba(52,211,153,.75),0 0 30px 8px rgba(52,211,153,.4),0 0 60px 16px rgba(52,211,153,.18)}
+#preset button:active:not(:disabled) .lv i{background:rgba(6,32,22,.25)}
+#preset button:disabled{opacity:.4;cursor:not-allowed}
+#preset button[aria-pressed="true"]:disabled{opacity:.75}
+#preset button[aria-pressed="true"]{background:radial-gradient(120% 90% at 50% 40%,#8CF7CF 0%,#4FE3A8 45%,#2FCB8C 100%);color:#062016;border-color:#7DF2C4;font-weight:700;text-shadow:0 1px 0 rgba(255,255,255,.35);transform:translateY(4px);box-shadow:inset 0 0 10px rgba(255,255,255,.35),0 0 12px 2px rgba(52,211,153,.75),0 0 30px 8px rgba(52,211,153,.4),0 0 60px 16px rgba(52,211,153,.18)}
+.lv{display:flex;align-items:flex-end;gap:3px;height:16px}
+.lv i{display:block;width:4px;border-radius:2px;background:#4A4F57}
+#preset button[aria-pressed="true"] .lv i{background:rgba(14,26,20,.25)}
+.lv i:nth-child(1){height:5px}.lv i:nth-child(2){height:8px}.lv i:nth-child(3){height:12px}.lv i:nth-child(4){height:16px}
+.lv[data-n="1"] i:nth-child(-n+1),.lv[data-n="2"] i:nth-child(-n+2),.lv[data-n="3"] i:nth-child(-n+3),.lv[data-n="4"] i:nth-child(-n+4){background:currentColor!important}
 @media (prefers-reduced-motion: reduce){.bar>i{transition:none}}
 </style>
 
@@ -160,12 +180,16 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
       MP3を選ぶ
     </label>
     <input id="file-mp3" class="file-input" type="file" accept=".mp3,audio/mpeg,audio/*">
-    <button class="btn btn-ghost" id="btn-sample" type="button">サンプル曲で試す（合成音・65秒）</button>
     <div class="note">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
       <span>曲はこのスマホの中だけで解析します。外部へは送信しません。</span>
     </div>
     <p class="err" id="home-err" hidden></p>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    <h2>サンプル曲</h2>
+    <div class="recent" id="samples"></div>
+    <p class="muted">押すだけで解析して、振付の画面になります。</p>
   </div>
   <div style="display:flex;flex-direction:column;gap:10px" id="recent-wrap" hidden>
     <h2>最近解析した曲</h2>
@@ -214,17 +238,30 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
     </div>
   </div>
 
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <span class="muted">演出（動きのコントラスト）</span>
+    <div class="seg" id="preset" role="group" aria-label="演出" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr))">
+      <button type="button" data-preset="calm" aria-pressed="false"><span class="lv" data-n="1" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Relax</button>
+      <button type="button" data-preset="normal" aria-pressed="false"><span class="lv" data-n="2" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Standard</button>
+      <button type="button" data-preset="contrast" aria-pressed="false"><span class="lv" data-n="3" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Dramatic</button>
+      <button type="button" data-preset="wild" aria-pressed="false"><span class="lv" data-n="4" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Powerful</button>
+    </div>
+    <p class="muted" id="preset-desc" style="font-size:12px"></p>
+    <p id="preset-lock" hidden style="font-size:12px;color:#FBBF24;display:flex;gap:6px;align-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>再生中は振付が基板に送られているため、演出と調整は変更できません。停止すると変更できます。</p>
+  </div>
+
   <div class="stage-card">
     <canvas class="stick" id="stick" width="264" height="368" role="img" aria-label="仮想Rainbow Stick：動きデータどおりに回転します"></canvas>
     <div class="now">
       <div class="clock" id="clock">0:00.0</div>
       <div class="chips"><span class="chip" id="chip-dir">待機中</span><span class="chip" id="chip-spd" hidden></span></div>
       <div style="display:flex;align-items:center;gap:12px">
-        <button class="playbtn" id="btn-play" type="button" aria-label="再生（基板へスタート信号）">
+        <button class="playbtn phys" id="btn-play" type="button" aria-pressed="false" aria-label="再生（基板へスタート信号）">
           <svg id="ico-play" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
           <svg id="ico-pause" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+          <span id="lbl-play" class="btn-lbl">PLAY</span>
         </button>
-        <button class="icon-btn" id="btn-rewind" type="button" aria-label="最初に戻す" style="margin-left:0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+        <button class="phys" id="btn-rewind" type="button" aria-label="停止して曲の初めに戻る" title="停止して曲の初めに戻る" style="width:52px;height:52px;border-radius:26px;display:flex;flex-direction:column;gap:3px;align-items:center;justify-content:center;cursor:pointer;flex:none"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2"/></svg><span class="btn-lbl">STOP</span></button>
       </div>
     </div>
   </div>
@@ -237,6 +274,7 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
       <button type="button" data-demo="high" aria-pressed="false">高速</button>
       <button type="button" data-demo="rev" aria-pressed="false">反転</button>
       <button type="button" data-demo="pulse" aria-pressed="false">弾む</button>
+      <button type="button" data-demo="tick" aria-pressed="false">刻む</button>
     </div>
   </div>
 
@@ -247,7 +285,7 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
     <canvas class="tl" id="tl" height="240" aria-label="速さと向きのタイムライン。タップした位置から再生します"></canvas>
     <div class="legend">
       <span><i style="background:var(--right)"></i>右回転</span><span><i style="background:var(--left)"></i>左回転</span>
-      <span><i style="background:#F2F0EA;width:2px"></i>曲調の変わり目</span><span><i style="background:#FFB020;width:2px"></i>強いアクセント</span>
+      <span><i style="background:#F2F0EA;width:2px"></i>曲調の変わり目</span><span><i style="background:#FFB020;width:2px"></i>強いアクセント</span><span><i style="background:#A78BFA;height:4px"></i>リズムを刻む場面</span>
     </div>
   </div>
 
@@ -302,6 +340,13 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
   </div>
 
   <div class="card">
+    <div class="sw"><label for="a-rhy" style="font-weight:700">一定のテンポの場面はオン・オフでリズムを刻む</label><input id="a-rhy" type="checkbox" checked></div>
+    <div class="ctl"><div class="ctl-h"><label for="a-rhyd">刻み方</label><span class="v" id="a-rhyd-v"></span></div>
+      <input id="a-rhyd" type="range" min="1" max="5" step="1" value="2"><div class="ends"><span>やわらかく</span><span>くっきり</span></div></div>
+    <p class="muted">拍ごとにモーターの電気を入れたり切ったりします。切っている間も球体は惰性で回り続けるので、回転が拍に合わせて脈打つように見えます。くっきりにするほど切る時間が長くなります。</p>
+  </div>
+
+  <div class="card">
     <div class="ctl-h"><span class="t">速さ</span><span class="muted" style="font-size:12px">上限は3V相当</span></div>
     <div class="three"><label for="a-low" style="color:var(--low)">低速</label><input id="a-low" type="range" min="20" max="127" value="55"><span class="mono" id="a-low-v" style="text-align:right">55</span></div>
     <div class="three"><label for="a-mid" style="color:var(--mid)">中速</label><input id="a-mid" type="range" min="20" max="127" value="90"><span class="mono" id="a-mid-v" style="text-align:right">90</span></div>
@@ -327,6 +372,7 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 
+<script>window.RS_SAMPLES=['jupiter'];</script>
 <script src="analyzer.js"></script>
 <script src="app.js"></script>
 </body>

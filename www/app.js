@@ -167,7 +167,7 @@
     return out;
   }
 
-  async function runAnalysis(name, getBuffer) {
+  async function runAnalysis(name, getBuffer, sampleFile) {
     stopPlay(true);
     cancelled = false; resetSteps(); $('an-name').textContent = name; show('analyze');
     setStep('load', 0);
@@ -191,7 +191,7 @@
     song = { name: name, buf: buf, ch: channelDb(buf), secs: (performance.now() - t) / 1000 };
     base = b; res = r; playOff = 0;
     var rec = (store('rs.recent.v1') || []).filter(function (x) { return x.name !== name; });
-    rec.unshift({ name: name, dur: buf.duration, tempo: Math.round(r.tempo), flips: r.flips.length });
+    rec.unshift({ name: name, dur: buf.duration, tempo: Math.round(r.tempo), flips: r.flips.length, sample: sampleFile || null });
     store('rs.recent.v1', rec.slice(0, 5)); renderRecent();
     await new Promise(function (r2) { setTimeout(r2, 500); });
     if (cancelled) return;
@@ -204,7 +204,33 @@
     runAnalysis(f.name, function () { return f.arrayBuffer().then(function (ab) { return new Promise(function (ok, ng) { ac.decodeAudioData(ab, ok, ng); }); }); });
     e.target.value = '';
   });
-  $('btn-sample').addEventListener('click', function () { var ac = getCtx(); runAnalysis('サンプル曲（合成・120BPM）', function () { return Promise.resolve(makeSample(ac)); }); });
+  // サンプル曲（このアプリと一緒に置いてある4曲）
+  var SAMPLES_ALL = [
+    { file: 'samples/jupiter.mp3', name: 'ホルスト「惑星」より 木星', dur: '8:27' },
+    { file: 'samples/aria.mp3', name: 'G線上のアリア', dur: '4:30' },
+    { file: 'samples/italy.mp3', name: 'メンデルスゾーン 交響曲第4番「イタリア」第1楽章', dur: '7:32' },
+    { file: 'samples/spring.mp3', name: '春', dur: '3:04' }
+  ];
+  // 同梱するサンプルを絞る（Android版はホルストのみ：window.RS_SAMPLES=['jupiter']）
+  var SAMPLES = window.RS_SAMPLES ? SAMPLES_ALL.filter(function (x) { return window.RS_SAMPLES.some(function (k) { return x.file.indexOf(k) >= 0; }); }) : SAMPLES_ALL;
+  function analyzeSample(sm) {
+    var ac = getCtx();
+    runAnalysis(sm.name, function () {
+      return fetch(sm.file).then(function (r) { if (!r.ok) throw new Error('not found'); return r.arrayBuffer(); })
+        .then(function (ab) { return new Promise(function (ok, ng) { ac.decodeAudioData(ab, ok, ng); }); });
+    }, sm.file);
+  }
+  (function () {
+    var w = $('samples');
+    SAMPLES.forEach(function (sm) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'recent-item';
+      b.style.cssText = 'cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit;min-height:56px';
+      b.innerHTML = '<span style="width:36px;height:36px;border-radius:18px;background:var(--amber);color:var(--amber-ink);display:flex;align-items:center;justify-content:center;flex:none" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span><span style="min-width:0;flex:1;display:flex;flex-direction:column"><span class="nm"></span><span class="mt"></span></span>';
+      b.querySelector('.nm').textContent = sm.name; b.querySelector('.mt').textContent = sm.dur;
+      b.addEventListener('click', function () { analyzeSample(sm); });
+      w.appendChild(b);
+    });
+  })();
   $('btn-cancel').addEventListener('click', function () { cancelled = true; show(song ? 'result' : 'home'); });
 
   function makeSample(ac) {
@@ -232,10 +258,18 @@
     var rec = store('rs.recent.v1') || [], w = $('recent'); w.innerHTML = '';
     $('recent-wrap').hidden = !rec.length;
     rec.forEach(function (r) {
-      var d = document.createElement('div'); d.className = 'recent-item';
-      d.innerHTML = '<div style="display:flex;align-items:flex-end;gap:3px;flex:none" aria-hidden="true"><i style="width:4px;height:10px;border-radius:2px;background:var(--low);display:block"></i><i style="width:4px;height:18px;border-radius:2px;background:var(--mid);display:block"></i><i style="width:4px;height:24px;border-radius:2px;background:var(--high);display:block"></i></div><div style="min-width:0;flex:1;display:flex;flex-direction:column"><span class="nm"></span><span class="mt"></span></div>';
+      var d = document.createElement('button'); d.type = 'button'; d.className = 'recent-item';
+      d.style.cssText = 'cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit;min-height:56px';
+      d.innerHTML = '<span style="display:flex;align-items:flex-end;gap:3px;flex:none" aria-hidden="true"><i style="width:4px;height:10px;border-radius:2px;background:var(--low);display:block"></i><i style="width:4px;height:18px;border-radius:2px;background:var(--mid);display:block"></i><i style="width:4px;height:24px;border-radius:2px;background:var(--high);display:block"></i></span><span style="min-width:0;flex:1;display:flex;flex-direction:column"><span class="nm"></span><span class="mt"></span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex:none;opacity:.6" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
       d.querySelector('.nm').textContent = r.name;
       d.querySelector('.mt').textContent = fmtShort(r.dur) + ' · ' + r.tempo + ' BPM · 切替 ' + r.flips + '回';
+      d.addEventListener('click', function () {
+        var sm = r.sample && SAMPLES.filter(function (x) { return x.file === r.sample; })[0];
+        if (sm) { analyzeSample(sm); return; }
+        // 端末内の曲はブラウザの決まりで自動では開けないため、同じ曲を選び直してもらう
+        toast('「' + r.name + '」をもう一度選んでください');
+        $('file-mp3').click();
+      });
       w.appendChild(d);
     });
   }
@@ -245,9 +279,17 @@
   var INT = { 1: [.60, .88], 2: [.52, .82], 3: [.45, .75], 4: [.38, .66], 5: [.30, .56] }, INTN = { 1: 'とてもおだやか', 2: 'おだやか', 3: 'ふつう', 4: 'はげしい', 5: 'とてもはげしい' };
   var NOV = { 1: .16, 2: .12, 3: .08, 4: .05, 5: .03 }, ACC = { 1: 99.95, 2: 99.85, 3: 99.7, 4: 99.4, 5: 99.0 }, LV = { 1: '低い', 2: 'やや低い', 3: 'ふつう', 4: 'やや高い', 5: '高い' };
   var PUL = { 1: [99.3, 22], 2: [98.8, 28], 3: [98.2, 36], 4: [97.5, 44], 5: [96.5, 54] }, PULN = { 1: '控えめ', 2: 'やや控えめ', 3: 'ふつう', 4: 'やや大きく', 5: '大きく・多く' };
-  var DEF = { int: 3, nov: 3, acc: true, accs: 3, low: 55, mid: 90, high: 127, rev: 6, lag: 80, spk: 0, pul: true, puls: 3 };
+  var DEF = { int: 3, nov: 3, acc: true, accs: 3, low: 55, mid: 90, high: 127, rev: 6, lag: 80, spk: 0, pul: true, puls: 3, rhy: true, rhyd: 2, preset: 'normal' };
+  var RHY = { 1: 0.7, 2: 0.58, 3: 0.48, 4: 0.4, 5: 0.32 }, RHYN = { 1: 'やわらかく', 2: 'やや柔らかく', 3: 'ふつう', 4: 'ややくっきり', 5: 'くっきり' };
+  // 演出：動きのコントラストをまとめて切り替える
+  var PRESETS = {
+    calm:     { label: 'Relax', desc: 'ゆったり回り、向き替えは大きな場面の変化だけ。弾みなし。', v: { int: 1, nov: 1, acc: false, accs: 1, low: 40, mid: 65, high: 95, pul: false, puls: 1, rhy: false, rhyd: 1 } },
+    normal:   { label: 'Standard', desc: '曲調の変わり目と強いアクセントで向きを変え、強い拍で弾みます。', v: { int: 3, nov: 3, acc: true, accs: 3, low: 55, mid: 90, high: 127, pul: true, puls: 3, rhy: true, rhyd: 2 } },
+    contrast: { label: 'Dramatic', desc: '静かな所はとてもゆっくり、盛り上がりは全開。速さの差を大きくします。', v: { int: 2, nov: 3, acc: true, accs: 2, low: 26, mid: 72, high: 127, pul: true, puls: 4, rhy: true, rhyd: 3 } },
+    wild:     { label: 'Powerful', desc: '全体に速く、小さな変化やアクセントでもどんどん向きを変え、よく弾みます。', v: { int: 5, nov: 5, acc: true, accs: 5, low: 75, mid: 108, high: 127, pul: true, puls: 5, rhy: true, rhyd: 4 } }
+  };
   var S = Object.assign({}, DEF, store('rs.opts.v1') || {});
-  function currentOpts() { var th = INT[S.int]; return { th: [-1, th[0], th[1]], speed: [S.low, S.mid, S.high], reverseTime: S.rev / 10, motorLag: S.lag / 1000, noveltyDelta: NOV[S.nov], accents: S.acc, accentPct: ACC[S.accs], minHold: 2.0, pulses: S.pul, pulsePct: PUL[S.puls][0], pulseAmt: PUL[S.puls][1] }; }
+  function currentOpts() { var th = INT[S.int]; return { th: [-1, th[0], th[1]], speed: [S.low, S.mid, S.high], reverseTime: S.rev / 10, motorLag: S.lag / 1000, noveltyDelta: NOV[S.nov], accents: S.acc, accentPct: ACC[S.accs], minHold: 2.0, pulses: S.pul, pulsePct: PUL[S.puls][0], pulseAmt: PUL[S.puls][1], rhythm: S.rhy !== false, rhythmDuty: RHY[S.rhyd || 2] }; }
   function syncCtl() {
     $('a-int').value = S.int; $('a-int-v').textContent = INTN[S.int];
     $('a-nov').value = S.nov; $('a-nov-v').textContent = LV[S.nov];
@@ -256,29 +298,48 @@
     $('a-rev').value = S.rev; $('a-rev-v').textContent = (S.rev / 10).toFixed(1) + ' 秒';
     $('a-lag').value = S.lag; $('a-lag-v').textContent = S.lag + ' ms';
     $('a-pul').checked = S.pul; $('a-puls').value = S.puls; $('a-puls').disabled = !S.pul; $('a-puls-v').textContent = S.pul ? PULN[S.puls] : '使わない';
+    $('a-rhy').checked = S.rhy !== false; $('a-rhyd').value = S.rhyd || 2; $('a-rhyd').disabled = S.rhy === false; $('a-rhyd-v').textContent = S.rhy === false ? '使わない' : RHYN[S.rhyd || 2];
     $('a-spk').value = S.spk; $('a-spk-v').textContent = (S.spk > 0 ? '+' : '') + S.spk + ' ms';
   }
-  ['int', 'nov', 'accs', 'low', 'mid', 'high', 'rev', 'lag', 'spk', 'puls'].forEach(function (k) { $('a-' + k).addEventListener('input', function (e) { S[k] = +e.target.value; syncCtl(); store('rs.opts.v1', S); }); });
-  $('a-pul').addEventListener('change', function (e) { S.pul = e.target.checked; syncCtl(); store('rs.opts.v1', S); });
-  $('a-acc').addEventListener('change', function (e) { S.acc = e.target.checked; syncCtl(); store('rs.opts.v1', S); });
+  ['int', 'nov', 'accs', 'low', 'mid', 'high', 'rev', 'lag', 'spk', 'puls', 'rhyd'].forEach(function (k) { $('a-' + k).addEventListener('input', function (e) { S[k] = +e.target.value; if (k !== 'rev' && k !== 'lag' && k !== 'spk') S.preset = null; syncCtl(); store('rs.opts.v1', S); }); });
+  $('a-rhy').addEventListener('change', function (e) { S.rhy = e.target.checked; S.preset = null; syncCtl(); store('rs.opts.v1', S); });
+  $('a-pul').addEventListener('change', function (e) { S.pul = e.target.checked; S.preset = null; syncCtl(); store('rs.opts.v1', S); });
+  $('a-acc').addEventListener('change', function (e) { S.acc = e.target.checked; S.preset = null; syncCtl(); store('rs.opts.v1', S); });
   syncCtl();
-  $('btn-reset').addEventListener('click', function () { S = Object.assign({}, DEF); syncCtl(); store('rs.opts.v1', S); toast('最初の設定に戻しました'); });
+  $('btn-reset').addEventListener('click', function () { S = Object.assign({}, DEF); syncCtl(); syncPreset(); store('rs.opts.v1', S); toast('最初の設定に戻しました'); });
   $('btn-redo').addEventListener('click', function () {
     if (!base) return;
     stopPlay(true);
     res = A.remotion(base, currentOpts()); playOff = 0;
-    renderResult(); show('result'); toast('振付を作り直しました（切替 ' + res.flips.length + '回）');
+    renderResult(); syncPreset(); show('result'); toast('振付を作り直しました（切替 ' + res.flips.length + '回）');
   });
   $('btn-adjust').addEventListener('click', function () { stopPlay(false); show('adjust'); });
   $('btn-back-result').addEventListener('click', function () { show(base ? 'result' : 'home'); });
   $('btn-back-home').addEventListener('click', function () { stopPlay(false); show('home'); });
+
+  // ================= 演出ボタン =================
+  function syncPreset() {
+    document.querySelectorAll('[data-preset]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.preset === S.preset ? 'true' : 'false'); });
+    $('preset-desc').textContent = S.preset ? PRESETS[S.preset].desc : '調整画面で細かく変えた設定です。';
+  }
+  document.querySelectorAll('[data-preset]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (play.on) return;
+      var p = PRESETS[b.dataset.preset]; Object.assign(S, p.v); S.preset = b.dataset.preset; store('rs.opts.v1', S); syncCtl(); syncPreset();
+      if (!base) return;
+      res = A.remotion(base, currentOpts());          // 再生中でもそのまま新しい振付に切り替わる
+      renderResult(); sizeTimeline(); drawTimelineBase();
+      toast('演出：' + p.label + '（切替 ' + res.flips.length + '回・弾み ' + res.pulses.length + '回）');
+    });
+  });
+  syncPreset();
 
   // ================= 結果 =================
   var STN = ['停止', '低速', '中速', '高速'], STC = ['#3A3E45', '#34D399', '#FBBF24', '#F87171'];
   function renderResult() {
     $('rs-meta').textContent = song.name + ' · ' + fmtShort(song.buf.duration) + ' · ' + Math.round(res.tempo) + ' BPM';
     var nk = res.flips.filter(function (f) { return f.k === '曲調'; }).length;
-    $('tl-info').textContent = '切替 ' + res.flips.length + '回（曲調 ' + nk + '・アクセント ' + (res.flips.length - nk) + '）・弾み ' + (res.pulses ? res.pulses.length : 0) + '回';
+    $('tl-info').textContent = '切替 ' + res.flips.length + '回（曲調 ' + nk + '・アクセント ' + (res.flips.length - nk) + '）・弾み ' + (res.pulses ? res.pulses.length : 0) + '回・刻み ' + (res.rhythm ? res.rhythm.beats.length : 0) + '回';
     var st = $('stats'); st.innerHTML = '';
     [1, 2, 3].forEach(function (k) { var d = document.createElement('div'); d.className = 'stat'; d.innerHTML = '<b style="color:' + STC[k] + '">' + Math.round(res.share[k] * 100) + '%</b><span>' + STN[k] + '</span>'; st.appendChild(d); });
     var d2 = document.createElement('div'); d2.className = 'stat'; d2.innerHTML = '<b>' + song.secs.toFixed(1) + '秒</b><span>解析時間</span>'; st.appendChild(d2);
@@ -304,6 +365,8 @@
       g.fillStyle = v > 0 ? '#FF9F43' : (v < 0 ? '#3B82F6' : '#3A3E45'); g.fillRect(x, dy, 1, dh);
     }
     res.flips.forEach(function (f) { var xx = G + Math.round(f.t * FPS / n * PW); g.fillStyle = f.k === '曲調' ? 'rgba(242,240,234,.85)' : '#FFB020'; g.fillRect(xx, top - 2 * s, Math.max(1, s), dy + dh - top + 2 * s); });
+    g.fillStyle = '#A78BFA';
+    ((res.rhythm && res.rhythm.segs) || []).forEach(function (sg) { var x0 = G + Math.round(sg.t0 * FPS / n * PW), x1 = G + Math.round(sg.t1 * FPS / n * PW); g.fillRect(x0, top - 9 * s, Math.max(2, x1 - x0), 4 * s); });
     g.fillStyle = 'rgba(242,240,234,.9)';
     (res.pulses || []).forEach(function (t) { var xp = G + Math.round(t * FPS / n * PW); g.beginPath(); g.arc(xp, dy - 4 * s, 1.6 * s, 0, 2 * Math.PI); g.fill(); });
     g.fillStyle = '#A3A7AE'; g.font = (10 * s) + 'px JetBrains Mono, monospace';
@@ -358,16 +421,24 @@
     return play.off + (ctx.currentTime - play.when) - (ctx.outputLatency || 0);
   }
   function boardPos(now) { return play.off + (now - play.boardStart) / 1000; }
-  function setPlayIcon(on) { $('ico-play').toggleAttribute('hidden', on); $('ico-pause').toggleAttribute('hidden', !on); $('btn-play').setAttribute('aria-label', on ? '一時停止（基板へ停止信号）' : '再生（基板へスタート信号）'); }
+  function setPlayIcon(on) {
+    // 曲の途中は振付（基板へ転送済み）を変えられないようにする
+    document.querySelectorAll('[data-preset]').forEach(function (b) { b.disabled = on; });
+    $('btn-adjust').disabled = on;
+    $('preset-lock').hidden = !on;
+    $('lbl-play').textContent = on ? 'PAUSE' : 'PLAY';
+    $('btn-play').setAttribute('aria-pressed', on ? 'true' : 'false');
+    $('ico-play').toggleAttribute('hidden', on); $('ico-pause').toggleAttribute('hidden', !on); $('btn-play').setAttribute('aria-label', on ? '一時停止（基板へ停止信号）' : '再生（基板へスタート信号）'); }
   $('btn-play').addEventListener('click', function () { if (play.on) stopPlay(false); else startPlay(); });
-  $('btn-rewind').addEventListener('click', function () { var w = play.on; stopPlay(true); $('clock').textContent = fmt(0); updateChips(0); if (w) startPlay(); });
+  $('btn-rewind').addEventListener('click', function () { setDemo(null); stopPlay(true); $('clock').textContent = fmt(0); var cd = $('chip-dir'); cd.textContent = '停止'; cd.style.background = '#2A2D33'; cd.style.color = 'var(--soft)'; $('chip-spd').hidden = true; toast('停止して曲の初めに戻りました'); });
 
   function updateChips(pos, waiting) {
     if (!res) return;
     var i = Math.max(0, Math.min(res.cmd.length - 1, Math.floor(pos * FPS))), v = res.cmd[i], stg = res.stage[i];
     var cd = $('chip-dir'), cs = $('chip-spd');
     if (waiting) { cd.textContent = '音を待っています'; cd.style.background = '#2A2D33'; cd.style.color = 'var(--soft)'; cs.hidden = true; return; }
-    if (v === 0) { cd.textContent = '反転中'; cd.style.background = '#2A2D33'; cd.style.color = 'var(--soft)'; }
+    var inR = false; ((res.rhythm && res.rhythm.segs) || []).forEach(function (sg) { if (pos >= sg.t0 - 0.1 && pos <= sg.t1 + 0.5) inR = true; });
+    if (v === 0) { cd.textContent = inR ? '電気オフ（惰性）' : '反転中'; cd.style.background = '#2A2D33'; cd.style.color = 'var(--soft)'; }
     else { cd.textContent = v > 0 ? '右回転' : '左回転'; cd.style.background = v > 0 ? '#FF9F43' : '#3B82F6'; cd.style.color = v > 0 ? '#121316' : '#fff'; }
     cs.hidden = false; cs.textContent = STN[stg]; cs.style.background = '#26292F'; cs.style.color = STC[stg];
   }
@@ -377,7 +448,9 @@
   function drawStick(dt, target) {
     var c = $('stick'), g = c.getContext('2d'), W = c.width, H = c.height, cx = W / 2;
     var prevV = stickV;
-    stickV += (target - stickV) * (1 - Math.exp(-dt / 0.15));
+    // 電気を切る(0)と惰性でゆっくり減速、弱めると中くらい、加速・逆転は速い
+    var tauV = target === 0 ? 1.1 : ((Math.sign(target) === Math.sign(stickV) && Math.abs(target) < Math.abs(stickV)) ? 0.4 : 0.15);
+    stickV += (target - stickV) * (1 - Math.exp(-dt / tauV));
     var acc = (stickV - prevV) / Math.max(dt, 0.004);
     // フィルムの下端は自由端：回転の変化に遅れてねじれ、揺れ戻る（反転で大きくねじれる）
     // ・回転中の空気抵抗による小さなねじれ（下ほど遅れる）
@@ -427,11 +500,12 @@
   }
 
   // ================= 動きの確認（音なし） =================
-  var demo = null, DEMO_LEN = { low: 5, mid: 5, high: 6, rev: 8, pulse: 6 };
+  var demo = null, DEMO_LEN = { low: 5, mid: 5, high: 6, rev: 8, pulse: 6, tick: 7 };
   function demoTarget(d, t) {
     var lv = { low: S.low / 127, mid: S.mid / 127, high: S.high / 127 };
     if (lv[d.type] !== undefined) return lv[d.type];
     if (d.type === 'rev') { var seg = Math.floor(t / 2.6), ph = t - seg * 2.6, sgn = seg % 2 ? -1 : 1, rv = S.rev / 10; if (ph < rv / 2 && seg > 0) return -sgn * lv.high * (1 - ph / (rv / 2)); if (ph < rv && seg > 0) return sgn * lv.high * ((ph - rv / 2) / (rv / 2)); return sgn * lv.high; }
+    if (d.type === 'tick') { var pr = 0.5, ph2 = t % pr; return ph2 < pr * RHY[S.rhyd || 2] ? lv.mid : 0; }
     if (d.type === 'pulse') { var bt = t % 0.5, amt = PUL[S.puls][1] / 127; return Math.min(1, lv.mid + (bt < 0.16 ? amt * (1 - bt / 0.16) : 0)); }
     return 0;
   }
