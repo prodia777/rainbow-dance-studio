@@ -1,0 +1,6 @@
+{
+  "appId": "com.prodia.rainbowdancestudio",
+  "appName": "Rainbow Dance Studio",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rainbow Dance Studio｜Android アプリ</title>
+<style>
+:root{--bg:#121316;--panel:#1C1E23;--line:#2A2D33;--fg:#F2F0EA;--muted:#A3A7AE;--amber:#FBBF24}
+html,body{background:var(--bg);color:var(--fg);margin:0}
+body{font-family:'Hiragino Sans','Yu Gothic','Noto Sans JP',sans-serif;line-height:1.7}
+.wrap{max-width:520px;margin:0 auto;padding:28px max(16px,env(safe-area-inset-left)) 40px max(16px,env(safe-area-inset-right));display:flex;flex-direction:column;gap:20px}
+.hero{display:flex;gap:16px;align-items:center}
+.hero img{width:88px;height:88px;border-radius:20px}
+h1{margin:0;font-size:26px;line-height:1.25}
+.sub{color:var(--muted);font-size:14px;margin:4px 0 0}
+.btn{display:flex;align-items:center;justify-content:center;gap:10px;min-height:58px;border-radius:16px;background:var(--amber);color:#121316;font-size:18px;font-weight:700;text-decoration:none}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.card h2{margin:0 0 8px;font-size:16px}
+ol{margin:0;padding-left:1.3em}
+li{margin:4px 0}
+.muted{color:var(--muted);font-size:13px}
+.en{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <img src="icon.png" alt="">
+    <div><h1>Rainbow Dance Studio</h1><p class="sub">音楽に合わせて Rainbow Stick が踊る振付アプリ（Android版）</p></div>
+  </div>
+  <a class="btn" href="RainbowDanceStudio.apk">Androidアプリをダウンロード</a>
+  <p class="muted" style="margin:0;text-align:center">バージョン 0.1.0（試作版）</p>
+  <div class="card">
+    <h2>インストールのしかた</h2>
+    <ol>
+      <li>上のボタンでファイル（RainbowDanceStudio.apk）をダウンロードします。</li>
+      <li>ダウンロードが終わったら、通知またはファイルアプリから開きます。</li>
+      <li>「この提供元のアプリを許可」の画面が出たら、許可してから戻ります。</li>
+      <li>「インストール」を押します。Google Play プロテクトの確認が出た場合は「インストール」を選びます。</li>
+    </ol>
+  </div>
+  <div class="card">
+    <h2>使える曲</h2>
+    <p style="margin:0">スマホに保存した MP3 などの音楽ファイルを選んで使います。曲はスマホの中だけで解析し、外部には送信しません。配信サービス（YouTube・Apple Music・Spotify など）の曲は使えません。</p>
+  </div>
+  <p class="muted" style="margin:0">iPhone版は準備中です。</p>
+  <p class="en">English: Tap the button to download the Android app (APK). Open the downloaded file, allow installation from this source when asked, then tap Install. Use music files saved on your phone; streaming services are not supported. iPhone version coming later.</p>
+  <p class="muted" style="margin:0">© PRODIA Co., Ltd. ／ Rainbow Stick</p>
+</div>
+</body>
+</html>

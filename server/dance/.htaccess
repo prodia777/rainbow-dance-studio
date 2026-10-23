@@ -1,0 +1,5 @@
+# Androidアプリ（APK）を正しくダウンロードさせる設定（このフォルダだけに効きます）
+AddType application/vnd.android.package-archive .apk
+<FilesMatch "\.apk$">
+  Header set Content-Disposition "attachment"
+</FilesMatch>

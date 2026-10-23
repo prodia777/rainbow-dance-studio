@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Rainbow Dance Studio</title>
+<link rel="stylesheet" href="fonts/fonts.css">
+<style>
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+
+/* 舞台の暗がり＋アンプの照明色。1画面ずつ縦に積むスマホアプリ（最大440px）。デザインは暗色に固定 */
+:root{
+  --bg:#121316; --panel:#1C1E23; --line:#2A2D33; --line2:#3A3E45;
+  --fg:#F2F0EA; --muted:#A3A7AE; --soft:#D6D8DC;
+  --amber:#FBBF24; --amber-ink:#121316;
+  --low:#34D399; --mid:#FBBF24; --high:#F87171;
+  --right:#FF9F43; --left:#3B82F6;
+  --f-body:'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  --f-mono:'JetBrains Mono', ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.app{max-width:440px;margin:0 auto;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:20px 32px;display:flex;flex-direction:column}
+.screen{display:flex;flex-direction:column;gap:18px}
+h1{margin:0;font-size:28px;line-height:1.25;font-weight:700;text-wrap:balance}
+h2{margin:0;font-size:15px;font-weight:700;color:var(--soft)}
+p{margin:0}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.24em;color:var(--amber);font-weight:700}
+.lead{color:#B4B8BF;font-size:15px;line-height:1.7}
+.muted{color:var(--muted);font-size:13px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.btn{appearance:none;border:none;border-radius:14px;min-height:52px;padding:0 18px;font:inherit;font-size:16px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:10px;text-decoration:none}
+.btn-primary{background:var(--amber);color:var(--amber-ink)}
+.btn-ghost{background:transparent;color:var(--fg);border:1px solid var(--line2);font-weight:500}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,button:focus-visible,input:focus-visible,label.btn:focus-within{outline:2px solid var(--amber);outline-offset:2px}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.topbar{display:flex;align-items:center;gap:6px}
+.icon-btn{width:44px;height:44px;border-radius:12px;border:none;background:transparent;color:var(--soft);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-left:-10px;flex:none}
+.seg{display:flex;gap:4px;padding:3px;border-radius:12px;background:var(--panel);border:1px solid var(--line)}
+.seg button{min-height:40px;padding:0 12px;border-radius:9px;border:none;background:transparent;color:var(--soft);font:inherit;font-size:13px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--amber);color:var(--amber-ink);font-weight:700}
+.chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:700}
+.file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.note{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.6;color:var(--muted)}
+.note svg{flex:none;margin-top:3px}
+.err{color:#FCA5A5;font-size:14px}
+
+/* ---- 工程リスト ---- */
+.steps{display:flex;flex-direction:column}
+.step{display:flex;align-items:center;gap:14px;padding:9px 0;border-bottom:1px solid #23262B}
+.step .dot{width:28px;height:28px;border-radius:14px;flex:none;display:flex;align-items:center;justify-content:center;background:#2A2D33;color:var(--amber-ink);font-family:var(--f-mono);font-size:13px;font-weight:700}
+.step[data-s="done"] .dot{background:var(--low)}
+.step[data-s="now"] .dot{background:var(--amber)}
+.step[data-s="wait"] .dot{color:var(--muted)}
+.step .lbl{flex:1}
+.step[data-s="wait"] .lbl{color:var(--muted)}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.bar>i{display:block;height:100%;width:0;background:var(--amber);border-radius:4px;transition:width .2s}
+
+/* ---- アナログメーター（AURORA VU-2 のデザイン） ---- */
+.plate{position:relative;border-radius:18px;padding:14px 12px 12px;border:1px solid rgba(255,255,255,.10);
+  background:radial-gradient(120% 80% at 50% -10%, rgba(255,209,150,.10), transparent 60%),repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, rgba(255,255,255,0) 1px 3px),linear-gradient(155deg,#33353b 0%,#1b1c21 42%,#282a30 68%,#101115 100%);
+  box-shadow:0 18px 40px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.13), inset 0 -2px 6px rgba(0,0,0,.7);display:flex;flex-direction:column;gap:10px}
+.plate-h{display:flex;justify-content:space-between;align-items:flex-end;padding:0 4px}
+.brand{font-size:11px;letter-spacing:.3em;color:#d8c9a6}
+.brand b{color:#f2e6c8;font-weight:600;letter-spacing:.2em}
+.sub{font-size:8px;letter-spacing:.3em;color:#9a9ba0;margin-top:4px}
+.pwr{display:flex;align-items:center;gap:6px;font-size:8px;letter-spacing:.22em;color:#9a9ba0}
+.pwr i{width:7px;height:7px;border-radius:50%;background:#59e0a4;box-shadow:0 0 9px #59e0a4}
+.vu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.vu-svg{display:block;width:100%;height:auto;filter:drop-shadow(0 8px 14px rgba(0,0,0,.55))}
+.vu-foot{display:flex;align-items:center;gap:7px;margin-top:6px;padding:0 6px}
+.vu-foot .ch{font-size:11px;letter-spacing:.3em;color:#cfc4a8;font-weight:600}
+.vled{width:8px;height:8px;border-radius:50%;background:#4a2a26;box-shadow:inset 0 0 3px rgba(0,0,0,.85)}
+.vled.on{background:#ff4a3d;box-shadow:0 0 12px #ff4a3d}
+.vu-foot .pk{font-size:8px;letter-spacing:.22em;color:#8f9096;margin-left:auto}
+
+/* ---- デジタルメーター（AURORA DA-2 のデザイン） ---- */
+.da{border-radius:16px;padding:12px 10px 10px;border:1px solid rgba(255,255,255,.10);color:#e9e4d8;
+  background:radial-gradient(120% 90% at 50% -20%, rgba(255,205,140,.09), transparent 62%),repeating-linear-gradient(90deg, rgba(255,255,255,.028) 0 1px, rgba(255,255,255,0) 1px 3px),linear-gradient(158deg,#2b2d33,#15161a 46%,#1f2126 72%,#0e0f12);
+  box-shadow:0 14px 32px rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.12), inset 0 -2px 8px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:8px}
+.da-meta{display:flex;align-items:center;gap:8px;font-size:7px;letter-spacing:.22em;color:#9a9ba0}
+.da-meta .u{color:#c9b68c;font-size:8px}
+.da-meta i{width:6px;height:6px;border-radius:50%;background:#59e0a4;box-shadow:0 0 9px #59e0a4;display:inline-block;margin-right:5px;vertical-align:middle}
+.da-ch{display:grid;grid-template-columns:16px minmax(0,1fr) 62px;column-gap:8px;row-gap:2px;align-items:center;padding:7px 8px;border-radius:9px;background:linear-gradient(180deg,#0a0b0d,#111318);border:1px solid rgba(255,255,255,.07);box-shadow:inset 0 2px 9px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.04)}
+.da-ch .ch{grid-column:1;grid-row:1/span 2;align-self:stretch;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#cfc4a8;border-right:1px solid rgba(255,255,255,.10)}
+.da-scale{grid-column:2;grid-row:1;position:relative;height:10px}
+.da-scale span{position:absolute;bottom:0;font-size:8px;line-height:1;color:#8a8c92}
+.da-scale span.hot{color:#c27a6f}
+.da-barw{grid-column:2;grid-row:2;position:relative;height:20px;padding:2px 3px;border-radius:4px;background:#05060a;box-shadow:inset 0 0 7px rgba(0,0,0,.95),0 1px 0 rgba(255,255,255,.05);box-sizing:border-box}
+.da-segs{display:flex;gap:1.5px;height:100%}
+.da-segs i{flex:1 1 0;min-width:0;border-radius:1px}
+.da-pk{position:absolute;top:1px;bottom:1px;width:2px;left:0;border-radius:1px;background:#f3f7ff;box-shadow:0 0 7px rgba(255,255,255,.95),0 0 14px rgba(180,220,255,.55)}
+.da-num{grid-column:3;grid-row:1/span 2;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.da-num svg{width:62px;height:auto;display:block;filter:drop-shadow(0 0 5px rgba(255,150,45,.42))}
+.da-ov{display:flex;align-items:center;gap:4px;font-size:6px;letter-spacing:.2em;color:#6f6155}
+.da-ov i{width:5px;height:5px;border-radius:50%;background:#331813;box-shadow:inset 0 0 3px #000}
+.da-ov.on{color:#ff9184}
+.da-ov.on i{background:#ff3b2f;box-shadow:0 0 10px #ff3b2f}
+
+/* ---- 再生画面 ---- */
+.stage-card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:14px;display:grid;grid-template-columns:132px minmax(0,1fr);gap:14px;align-items:center}
+.stick{width:132px;height:184px;display:block;border-radius:12px;background:#0d0e11}
+.now{display:flex;flex-direction:column;gap:8px;min-width:0}
+.clock{font-family:var(--f-mono);font-size:30px;font-weight:700;line-height:1}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.playbtn{width:60px;height:60px;border-radius:30px;border:none;background:var(--amber);color:var(--amber-ink);display:flex;align-items:center;justify-content:center;cursor:pointer}
+.sync{font-family:var(--f-mono);font-size:11px;line-height:1.55;color:var(--muted);background:#0f1013;border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:auto 1fr;column-gap:12px}
+.sync b{color:var(--soft);font-weight:500;text-align:right}
+.tl{width:100%;height:120px;display:block;cursor:pointer;touch-action:manipulation}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:#B4B8BF}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:2px}
+.stat b{font-family:var(--f-mono);font-size:17px}
+.stat span{font-size:12px;color:var(--muted)}
+
+/* ---- 調整 ---- */
+.ctl{display:flex;flex-direction:column;gap:6px}
+.ctl-h{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.ctl-h label,.ctl-h .t{font-size:15px;font-weight:700}
+.ctl-h .v{font-family:var(--f-mono);font-size:13px;color:var(--amber);white-space:nowrap}
+input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
+.ends{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px}
+.sw input{width:22px;height:22px;accent-color:var(--amber)}
+.three{display:grid;grid-template-columns:48px minmax(0,1fr) 36px;align-items:center;gap:10px}
+.three label{font-weight:700;font-size:14px}
+.recent{display:flex;flex-direction:column;gap:8px}
+.recent-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--panel);border:1px solid var(--line);border-radius:14px}
+.recent-item .nm{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-item .mt{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom, 0px));background:#2A2D33;color:var(--fg);padding:10px 16px;border-radius:12px;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.5);z-index:20;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion: reduce){.bar>i{transition:none}}
+</style>
+
+</head>
+<body>
+<div class="app">
+
+<!-- 1 曲を選ぶ -->
+<section class="screen" id="scr-home">
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div class="eyebrow">RAINBOW STICK</div>
+    <h1>Rainbow Dance Studio</h1>
+    <p class="lead">MP3を選ぶと、曲調の変わり目とリズムに合わせて回る振付を自動で作ります。</p>
+  </div>
+  <div class="card" style="gap:16px">
+    <div id="meter-home"></div>
+    <label class="btn btn-primary" for="file-mp3" style="min-height:60px;font-size:18px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      MP3を選ぶ
+    </label>
+    <input id="file-mp3" class="file-input" type="file" accept=".mp3,audio/mpeg,audio/*">
+    <button class="btn btn-ghost" id="btn-sample" type="button">サンプル曲で試す（合成音・65秒）</button>
+    <div class="note">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <span>曲はこのスマホの中だけで解析します。外部へは送信しません。</span>
+    </div>
+    <p class="err" id="home-err" hidden></p>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px" id="recent-wrap" hidden>
+    <h2>最近解析した曲</h2>
+    <div class="recent" id="recent"></div>
+    <p class="muted">もう一度再生するときは、同じMP3を選び直してください。</p>
+  </div>
+  <p class="muted" style="border-top:1px solid var(--line);padding-top:14px">iPhoneでは「ファイル」アプリに保存したMP3を選べます。</p>
+</section>
+
+<!-- 2 解析中 -->
+<section class="screen" id="scr-analyze" hidden>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:8px">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <div class="eyebrow">ANALYZING</div>
+      <h1 style="font-size:26px">解析しています</h1>
+      <p class="mono muted" id="an-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
+    </div>
+    <div class="seg" role="group" aria-label="メーターの表示">
+      <button type="button" data-meter="analog" aria-pressed="true">アナログ</button>
+      <button type="button" data-meter="digital" aria-pressed="false">デジタル</button>
+    </div>
+  </div>
+  <div id="meter-analog"></div>
+  <div id="meter-digital" hidden></div>
+  <div class="steps" id="steps">
+    <div class="step" data-k="load" data-s="wait"><div class="dot">1</div><div class="lbl">曲を読み込む</div><div class="mono muted" data-note></div></div>
+    <div class="step" data-k="level" data-s="wait"><div class="dot">2</div><div class="lbl">音の強さと響きを測る</div><div class="mono muted" data-note></div></div>
+    <div class="step" data-k="beat" data-s="wait"><div class="dot">3</div><div class="lbl">拍とテンポを見つける</div><div class="mono muted" data-note></div></div>
+    <div class="step" data-k="motion" data-s="wait"><div class="dot">4</div><div class="lbl">曲調の変わり目と振付を作る</div><div class="mono muted" data-note></div></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="display:flex;justify-content:space-between" class="muted"><span id="an-msg">準備しています</span><span class="mono" id="an-pct">0%</span></div>
+    <div class="bar"><i id="an-bar"></i></div>
+  </div>
+  <p class="err" id="an-err" hidden></p>
+  <button class="btn btn-ghost" id="btn-cancel" type="button">中止する</button>
+</section>
+
+<!-- 3 結果・再生 -->
+<section class="screen" id="scr-result" hidden>
+  <div class="topbar">
+    <button class="icon-btn" id="btn-back-home" type="button" aria-label="曲を選ぶ画面へ戻る"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+    <div style="display:flex;flex-direction:column;min-width:0">
+      <h1 style="font-size:20px">振付ができました</h1>
+      <span class="mono muted" id="rs-meta" style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    </div>
+  </div>
+
+  <div class="stage-card">
+    <canvas class="stick" id="stick" width="264" height="368" role="img" aria-label="仮想Rainbow Stick：動きデータどおりに回転します"></canvas>
+    <div class="now">
+      <div class="clock" id="clock">0:00.0</div>
+      <div class="chips"><span class="chip" id="chip-dir">待機中</span><span class="chip" id="chip-spd" hidden></span></div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="playbtn" id="btn-play" type="button" aria-label="再生（基板へスタート信号）">
+          <svg id="ico-play" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+          <svg id="ico-pause" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" hidden><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>
+        </button>
+        <button class="icon-btn" id="btn-rewind" type="button" aria-label="最初に戻す" style="margin-left:0"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <span class="muted">動きを確かめる（音なし）</span>
+    <div class="seg" id="demo" role="group" aria-label="動きを確かめる" style="flex-wrap:wrap">
+      <button type="button" data-demo="low" aria-pressed="false">低速</button>
+      <button type="button" data-demo="mid" aria-pressed="false">中速</button>
+      <button type="button" data-demo="high" aria-pressed="false">高速</button>
+      <button type="button" data-demo="rev" aria-pressed="false">反転</button>
+      <button type="button" data-demo="pulse" aria-pressed="false">弾む</button>
+    </div>
+  </div>
+
+  <div id="meter-play"></div>
+
+  <div class="card" style="padding:14px 14px 12px;gap:8px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:700">振付のタイムライン</span><span class="muted" style="font-size:12px" id="tl-info"></span></div>
+    <canvas class="tl" id="tl" height="240" aria-label="速さと向きのタイムライン。タップした位置から再生します"></canvas>
+    <div class="legend">
+      <span><i style="background:var(--right)"></i>右回転</span><span><i style="background:var(--left)"></i>左回転</span>
+      <span><i style="background:#F2F0EA;width:2px"></i>曲調の変わり目</span><span><i style="background:#FFB020;width:2px"></i>強いアクセント</span>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="sync" id="sync" aria-live="off">
+    <span>基板へのスタート信号</span><b id="sy-sig">—</b>
+    <span>スピーカーの遅れ（自動＋補正）</span><b id="sy-lat">—</b>
+    <span>基板の時計で進む位置</span><b id="sy-board">—</b>
+    <span>聞こえている音の位置</span><b id="sy-audio">—</b>
+    <span>ずれ</span><b id="sy-diff">—</b>
+  </div>
+
+  <div class="row">
+    <button class="btn btn-ghost" id="btn-adjust" type="button">調整する</button>
+    <button class="btn btn-primary" id="btn-export" type="button" style="flex:1.4">データを書き出す</button>
+  </div>
+  <label class="btn btn-ghost" for="file-mp3">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    次の曲を選ぶ
+  </label>
+  <p class="muted" style="text-align:center">基板が届いたら、ここから基板へ動きデータとスタート信号を送ります。今は画面の仮想スティックが基板の代わりです。</p>
+</section>
+
+<!-- 4 調整 -->
+<section class="screen" id="scr-adjust" hidden>
+  <div class="topbar">
+    <button class="icon-btn" id="btn-back-result" type="button" aria-label="結果へ戻る"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+    <h1 style="font-size:20px">振付を調整</h1>
+  </div>
+
+  <div class="card">
+    <div class="ctl"><div class="ctl-h"><label for="a-int">動きの激しさ</label><span class="v" id="a-int-v"></span></div>
+      <input id="a-int" type="range" min="1" max="5" step="1" value="3"><div class="ends"><span>おだやか</span><span>はげしい</span></div></div>
+  </div>
+
+  <div class="card">
+    <span style="font-size:15px;font-weight:700">向きを変えるタイミング</span>
+    <div class="ctl"><div class="ctl-h"><label for="a-nov">曲調の変わり目の感度</label><span class="v" id="a-nov-v"></span></div>
+      <input id="a-nov" type="range" min="1" max="5" step="1" value="3"><div class="ends"><span>大きな変化だけ</span><span>小さな変化でも</span></div></div>
+    <div class="sw"><label for="a-acc" style="font-weight:700">強いアクセントでも切り替える</label><input id="a-acc" type="checkbox" checked></div>
+    <div class="ctl"><div class="ctl-h"><label for="a-accs">アクセントの感度</label><span class="v" id="a-accs-v"></span></div>
+      <input id="a-accs" type="range" min="1" max="5" step="1" value="3"><div class="ends"><span>特に強い音だけ</span><span>強めの音でも</span></div></div>
+    <p class="muted">静かな部分では向きを変えず、ゆっくり一方向に回ります。</p>
+  </div>
+
+  <div class="card">
+    <div class="sw"><label for="a-pul" style="font-weight:700">強い拍で弾む</label><input id="a-pul" type="checkbox" checked></div>
+    <div class="ctl"><div class="ctl-h"><label for="a-puls">弾み方</label><span class="v" id="a-puls-v"></span></div>
+      <input id="a-puls" type="range" min="1" max="5" step="1" value="3"><div class="ends"><span>控えめ</span><span>大きく・多く</span></div></div>
+    <p class="muted">強い拍で短く加速します。高速で回っているときは、一瞬ゆるめてから戻します。基板のモーターも同じ動きをします。</p>
+  </div>
+
+  <div class="card">
+    <div class="ctl-h"><span class="t">速さ</span><span class="muted" style="font-size:12px">上限は3V相当</span></div>
+    <div class="three"><label for="a-low" style="color:var(--low)">低速</label><input id="a-low" type="range" min="20" max="127" value="55"><span class="mono" id="a-low-v" style="text-align:right">55</span></div>
+    <div class="three"><label for="a-mid" style="color:var(--mid)">中速</label><input id="a-mid" type="range" min="20" max="127" value="90"><span class="mono" id="a-mid-v" style="text-align:right">90</span></div>
+    <div class="three"><label for="a-high" style="color:var(--high)">高速</label><input id="a-high" type="range" min="20" max="127" value="127"><span class="mono" id="a-high-v" style="text-align:right">127</span></div>
+  </div>
+
+  <div class="card">
+    <div class="ctl"><div class="ctl-h"><label for="a-rev">反転にかかる時間</label><span class="v" id="a-rev-v"></span></div>
+      <input id="a-rev" type="range" min="3" max="12" step="1" value="6"></div>
+    <div class="ctl"><div class="ctl-h"><label for="a-lag">モーターの反応の遅れ</label><span class="v" id="a-lag-v"></span></div>
+      <input id="a-lag" type="range" min="0" max="200" step="10" value="80"></div>
+    <div class="ctl"><div class="ctl-h"><label for="a-spk">スピーカーの遅れの補正</label><span class="v" id="a-spk-v"></span></div>
+      <input id="a-spk" type="range" min="-200" max="400" step="10" value="0"></div>
+    <p class="muted">反転の時間とモーターの遅れは、基板の試作で測った値に合わせます。スピーカーの補正は再生時だけに使い、動きデータは変わりません。</p>
+  </div>
+
+  <div class="row">
+    <button class="btn btn-ghost" id="btn-reset" type="button">元に戻す</button>
+    <button class="btn btn-primary" id="btn-redo" type="button" style="flex:1.6">この設定で作り直す</button>
+  </div>
+</section>
+
+</div>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="analyzer.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
