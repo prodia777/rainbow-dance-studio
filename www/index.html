@@ -111,6 +111,9 @@ p{margin:0}
 .now{display:flex;flex-direction:column;gap:8px;min-width:0}
 .clock{font-family:var(--f-mono);font-size:30px;font-weight:700;line-height:1}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
+/* 状態表示（向き・速さ）：白地。向きは黒文字、速さは段階の色の文字 */
+#chip-dir,#chip-spd{background:linear-gradient(180deg,#FFFFFF 0%,#E9EBEF 100%)!important;box-shadow:inset 0 1px 0 #fff,0 2px 0 #6E737C}
+#chip-dir{color:#121316!important}
 .playbtn{width:60px;height:60px;border-radius:30px;display:flex;flex-direction:column;gap:2px;align-items:center;justify-content:center;cursor:pointer}
 /* PLAY・STOP：演出ボタンと同じ物理スイッチ（押していない＝盛り上がり／押した・再生中＝緑に光る） */
 .phys{border:1px solid #FFFFFF;border-bottom-color:#9CA1AA;background:linear-gradient(180deg,#FFFFFF 0%,#EEF0F3 55%,#D9DCE1 100%);color:#121316;text-shadow:none;box-shadow:inset 0 1px 0 #FFFFFF,inset 0 -2px 3px rgba(0,0,0,.12),0 5px 0 #6E737C,0 8px 12px rgba(0,0,0,.55);transform:translateY(0);transition:transform .08s,box-shadow .08s,background .15s;flex:none}
