@@ -537,7 +537,7 @@
     if (!res) return;
     var stem = song.name.replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_');
     var lines = ['時間[秒],音の強さ(0-1),速さ段階,向き,出力値(-127〜127)'];
-    for (var i = 0; i < res.cmd.length; i++) { var v = res.cmd[i]; lines.push((i / FPS).toFixed(2) + ',' + res.level[i].toFixed(3) + ',' + STN[res.stage[i]] + ',' + (v > 0 ? '右' : (v < 0 ? '左' : '停止')) + ',' + v); }
+    for (var i = 0; i < res.cmd.length; i++) { var v = res.cmd[i]; lines.push((i / FPS).toFixed(2) + ',' + res.level[i].toFixed(3) + ',' + STN[res.stage[i]] + ',' + (v > 0 ? '右' : (v < 0 ? '左' : '電気オフ(惰性)')) + ',' + v); }
     var csv = new Uint8Array([0xEF, 0xBB, 0xBF].concat(Array.from(new TextEncoder().encode(lines.join('\r\n')))));
     var blob = zip([{ name: stem + '_motion.bin', data: A.toBin(res.cmd, song.name) }, { name: stem + '_motion.csv', data: csv }]);
     // Androidアプリ：スマホの「Documents/RainbowDanceStudio」フォルダに保存
