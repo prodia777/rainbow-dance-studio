@@ -225,7 +225,7 @@
     SAMPLES.forEach(function (sm) {
       var b = document.createElement('button'); b.type = 'button'; b.className = 'recent-item';
       b.style.cssText = 'cursor:pointer;width:100%;text-align:left;font:inherit;color:inherit;min-height:56px';
-      b.innerHTML = '<span style="width:36px;height:36px;border-radius:18px;background:var(--amber);color:var(--amber-ink);display:flex;align-items:center;justify-content:center;flex:none" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span><span style="min-width:0;flex:1;display:flex;flex-direction:column"><span class="nm"></span><span class="mt"></span></span>';
+      b.innerHTML = '<span style="width:36px;height:36px;border-radius:18px;background:linear-gradient(180deg,#FFFFFF 0%,#E3E6EA 100%);color:#121316;box-shadow:inset 0 1px 0 #fff,0 3px 0 #6E737C,0 4px 8px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;flex:none" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span><span style="min-width:0;flex:1;display:flex;flex-direction:column"><span class="nm"></span><span class="mt"></span></span>';
       b.querySelector('.nm').textContent = sm.name; b.querySelector('.mt').textContent = sm.dur;
       b.addEventListener('click', function () { analyzeSample(sm); });
       w.appendChild(b);

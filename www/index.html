@@ -35,7 +35,9 @@ p{margin:0}
 .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px}
 .btn{appearance:none;border:none;border-radius:14px;min-height:52px;padding:0 18px;font:inherit;font-size:16px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:10px;text-decoration:none}
-.btn-primary{background:var(--amber);color:var(--amber-ink)}
+.btn-primary{background:linear-gradient(180deg,#FFFFFF 0%,#EEF0F3 55%,#D9DCE1 100%);color:#121316;border:1px solid #FFFFFF;border-bottom-color:#9CA1AA;box-shadow:inset 0 1px 0 #FFFFFF,inset 0 -2px 3px rgba(0,0,0,.12),0 5px 0 #6E737C,0 8px 12px rgba(0,0,0,.5);transition:transform .08s,box-shadow .08s,background .15s}
+.btn-primary:hover:not(:disabled){background:linear-gradient(180deg,#FFFFFF 0%,#F6F7F9 55%,#E4E7EB 100%)}
+.btn-primary:active:not(:disabled){background:radial-gradient(120% 90% at 50% 40%,#8CF7CF 0%,#4FE3A8 45%,#2FCB8C 100%);color:#062016;border-color:#7DF2C4;transform:translateY(4px);box-shadow:inset 0 0 10px rgba(255,255,255,.35),0 0 12px 2px rgba(52,211,153,.75),0 0 30px 8px rgba(52,211,153,.4)}
 .btn-ghost{background:transparent;color:var(--fg);border:1px solid var(--line2);font-weight:500}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 .btn:focus-visible,button:focus-visible,input:focus-visible,label.btn:focus-within{outline:2px solid var(--amber);outline-offset:2px}
@@ -45,7 +47,7 @@ p{margin:0}
 .icon-btn{width:44px;height:44px;border-radius:12px;border:none;background:transparent;color:var(--soft);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-left:-10px;flex:none}
 .seg{display:flex;gap:4px;padding:3px;border-radius:12px;background:var(--panel);border:1px solid var(--line)}
 .seg button{min-height:40px;padding:0 12px;border-radius:9px;border:none;background:transparent;color:var(--soft);font:inherit;font-size:13px;cursor:pointer}
-.seg button[aria-pressed="true"]{background:var(--amber);color:var(--amber-ink);font-weight:700}
+.seg button[aria-pressed="true"]{background:radial-gradient(120% 90% at 50% 40%,#8CF7CF 0%,#4FE3A8 45%,#2FCB8C 100%);color:#062016;font-weight:700;box-shadow:0 0 10px 1px rgba(52,211,153,.6)}
 .chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;font-size:13px;font-weight:700}
 .file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .note{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.6;color:var(--muted)}
