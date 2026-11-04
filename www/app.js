@@ -538,12 +538,14 @@
   }
 
   // 仮想Rainbow Stick
+  // 基板へ送る値を、絵の回転の強さへ直す。実物は弱い出力でも大きく広がるので、18%で約7割、8の字の35%で最大にする
+  function stickTarget(v) { if (!v) return 0; var r = Math.min(1, Math.abs(v) / (A.CAP * 0.35)); return (v > 0 ? 1 : -1) * Math.pow(r, 0.6); }
   var stickV = 0, stickA = 0, stickShape = 0, shapeVel = 0, twist = 0, twistV = 0, tw8 = 0, tw8V = 0;
   function drawStick(dt, target) {
     var c = $('stick'), g = c.getContext('2d'), W = c.width, H = c.height, cx = W / 2;
     var prevV = stickV;
     // 電気を切る(0)と惰性でゆっくり減速、弱めると中くらい、加速・逆転は速い
-    var tauV = target === 0 ? 1.1 : ((Math.sign(target) === Math.sign(stickV) && Math.abs(target) < Math.abs(stickV)) ? 0.4 : 0.15);
+    var tauV = target === 0 ? 0.4 : ((Math.sign(target) === Math.sign(stickV) && Math.abs(target) < Math.abs(stickV)) ? 0.4 : 0.15);
     stickV += (target - stickV) * (1 - Math.exp(-dt / tauV));
     var acc = (stickV - prevV) / Math.max(dt, 0.004);
     // フィルムの下端は自由端：回転の変化に遅れてねじれ、揺れ戻る（反転で大きくねじれる）
@@ -649,7 +651,7 @@
         pos = Math.max(0, ap);
         if (bp < play.off) { updateChips(play.off, true); $('sy-board').textContent = '待機 ' + Math.round((play.off - bp) * 1000) + ' ms'; }
         else {
-          var i = Math.min(res.cmd.length - 1, Math.floor(bp * FPS)); target = res.cmd[i] / (A.CAP * 0.35) * 0.9; updateChips(bp);
+          var i = Math.min(res.cmd.length - 1, Math.floor(bp * FPS)); target = stickTarget(res.cmd[i]); updateChips(bp);
           $('sy-board').textContent = fmt(bp);
         }
         $('sy-audio').textContent = ap < play.off ? '— 音が出る前' : fmt(ap);
