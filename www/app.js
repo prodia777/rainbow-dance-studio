@@ -1,7 +1,7 @@
 (function () {
   'use strict';
-  var A = window.RSAnalyzer, $ = function (id) { return document.getElementById(id); };
-  var FPS = 1000 / A.FRAME_MS;
+  var A = window.RSChoreo, Board = window.RSBoard, $ = function (id) { return document.getElementById(id); };
+  var FPS = 50;
 
   function store(key, val) { try { if (val === undefined) { var s = localStorage.getItem(key); return s ? JSON.parse(s) : null; } localStorage.setItem(key, JSON.stringify(val)); } catch (e) { return null; } }
   function toast(msg) { var t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(function () { t.hidden = true; }, 2600); }
@@ -129,8 +129,8 @@
   function simDigital(ch, t, dt) { var ph = ch === 'L' ? 0 : 2.1, k = 'd' + ch; if (Math.random() < dt * 0.8) simK[k] = 6 + Math.random() * 14; simK[k] *= Math.exp(-dt / 0.35); return -24 + 7.5 * Math.sin(t * .63 + ph) + 3.4 * Math.sin(t * 1.37 + ph * 1.6) + 2.2 * Math.sin(t * .23 + ph * .8) + 1.4 * Math.sin(t * 2.9 + ph * 2.2) + simK[k]; }
 
   // ================= 画面 =================
-  var screens = ['home', 'analyze', 'result', 'adjust'], cur = 'home';
-  function show(name) { cur = name; screens.forEach(function (s) { $('scr-' + s).hidden = s !== name; }); window.scrollTo(0, 0); if (name === 'result') { sizeTimeline(); drawTimelineBase(); } }
+  var screens = ['home', 'analyze', 'result'], cur = 'home';
+  function show(name) { cur = name; screens.forEach(function (s) { $('scr-' + s).hidden = s !== name; }); $('boardbar').hidden = name === 'analyze'; window.scrollTo(0, 0); if (name === 'result') { sizeTimeline(); drawTimelineBase(); } }
 
   var mHome = createDigital($('meter-home')), mAnalog = createAnalog($('meter-analog')), mDig2 = createDigital($('meter-digital')), mPlay = createDigital($('meter-play'));
   var meterMode = store('rs.meter') || 'analog';
@@ -139,7 +139,7 @@
   setMeterMode(meterMode);
 
   // ================= 曲の読み込みと解析 =================
-  var ctx = null, song = null, base = null, res = null, cancelled = false;
+  var ctx = null, song = null, res = null, cancelled = false;
   function getCtx() { if (!ctx) { var C = window.AudioContext || window.webkitAudioContext; ctx = new C(); } if (ctx.state === 'suspended') ctx.resume(); return ctx; }
 
   var STEP_RANGE = { load: [0, 10], level: [10, 70], beat: [70, 82], motion: [82, 100] }, ORDER_ST = ['load', 'level', 'beat', 'motion'];
@@ -176,26 +176,33 @@
     catch (e) { $('an-err').textContent = 'この曲を読み込めませんでした。MP3ファイルか確認して、もう一度選んでください。'; $('an-err').hidden = false; return; }
     if (cancelled) return;
     setStep('load', 1, fmtShort(buf.duration));
-    var mono = new Float32Array(buf.length);
-    for (var c = 0; c < buf.numberOfChannels; c++) { var d = buf.getChannelData(c); for (var i = 0; i < d.length; i++) mono[i] += d[i] / buf.numberOfChannels; }
-    var t = performance.now();
-    var b = await A.analyze(mono, buf.sampleRate, function (k, p) { if (k !== 'load') setStep(k, p); });
+    var t = performance.now(), a, r;
+    try {
+      // 曲全体を 22050Hz・モノラルにする（PC版の解析と同じ条件）
+      var oc = new OfflineAudioContext(1, Math.max(1, Math.round(buf.duration * A.SR)), A.SR), os = oc.createBufferSource();
+      os.buffer = buf; os.connect(oc.destination); os.start();
+      var mono = (await oc.startRendering()).getChannelData(0);
+      if (cancelled) return;
+      a = await A.analyze(mono, function (k, p) { setStep(k, p); });
+      if (cancelled) return;
+      setStep('level', 1, Math.round(a.dur * FPS).toLocaleString() + 'コマ');
+      setStep('motion', 0);
+      await new Promise(function (r0) { setTimeout(r0, 30); });
+      r = decorate(A.choreograph(a));
+    } catch (e) { $('an-err').textContent = 'この曲を解析できませんでした（' + ((e && e.message) || 'エラー') + '）。別の曲を選んでください。'; $('an-err').hidden = false; return; }
     if (cancelled) return;
-    setStep('level', 1, Math.round(b.duration * FPS).toLocaleString() + 'コマ');
-    setStep('beat', 1, Math.round(b.beat.tempo) + ' BPM');
-    setStep('motion', 0);
-    await new Promise(function (r) { setTimeout(r, 30); });
-    var r = A.remotion(b, currentOpts());
-    if (cancelled) return;
-    setStep('motion', 1, '切替' + r.flips.length + '回');
+    setStep('beat', 1, Math.round(r.tempo) + ' BPM');
+    setStep('motion', 1, '8の字' + r.eights.length + '回');
     song = { name: name, buf: buf, ch: channelDb(buf), secs: (performance.now() - t) / 1000 };
-    base = b; res = r; playOff = 0; paused = false;
+    res = r; playOff = 0; paused = false;
+    res.key = name + '|' + r.cmd.length + '|' + r.sum;
     var rec = (store('rs.recent.v1') || []).filter(function (x) { return x.name !== name; });
-    rec.unshift({ name: name, dur: buf.duration, tempo: Math.round(r.tempo), flips: r.flips.length, sample: sampleFile || null });
+    rec.unshift({ name: name, dur: buf.duration, tempo: Math.round(r.tempo), sample: sampleFile || null });
     store('rs.recent.v1', rec.slice(0, 5)); renderRecent();
     await new Promise(function (r2) { setTimeout(r2, 500); });
     if (cancelled) return;
     renderResult(); show('result');
+    if (Board.state === 'on') ensureLoaded().catch(function (e) { bdLog(e.message, true); });
   }
 
   $('file-mp3').addEventListener('change', function (e) {
@@ -275,74 +282,40 @@
   }
   renderRecent();
 
-  // ================= 調整 =================
-  var INT = { 1: [.60, .88], 2: [.52, .82], 3: [.45, .75], 4: [.38, .66], 5: [.30, .56] }, INTN = { 1: 'とてもおだやか', 2: 'おだやか', 3: 'ふつう', 4: 'はげしい', 5: 'とてもはげしい' };
-  var NOV = { 1: .16, 2: .12, 3: .08, 4: .05, 5: .03 }, ACC = { 1: 99.95, 2: 99.85, 3: 99.7, 4: 99.4, 5: 99.0 }, LV = { 1: '低い', 2: 'やや低い', 3: 'ふつう', 4: 'やや高い', 5: '高い' };
-  var PUL = { 1: [99.3, 22], 2: [98.8, 28], 3: [98.2, 36], 4: [97.5, 44], 5: [96.5, 54] }, PULN = { 1: '控えめ', 2: 'やや控えめ', 3: 'ふつう', 4: 'やや大きく', 5: '大きく・多く' };
-  var DEF = { int: 3, nov: 3, acc: true, accs: 3, low: 55, mid: 90, high: 127, rev: 6, lag: 80, spk: 0, pul: true, puls: 3, rhy: true, rhyd: 2, preset: 'normal' };
-  var RHY = { 1: 0.7, 2: 0.58, 3: 0.48, 4: 0.4, 5: 0.32 }, RHYN = { 1: 'やわらかく', 2: 'やや柔らかく', 3: 'ふつう', 4: 'ややくっきり', 5: 'くっきり' };
-  // 演出：動きのコントラストをまとめて切り替える
-  var PRESETS = {
-    calm:     { label: 'Relax', desc: 'ゆったり回り、向き替えは大きな場面の変化だけ。弾みなし。', v: { int: 1, nov: 1, acc: false, accs: 1, low: 40, mid: 65, high: 95, pul: false, puls: 1, rhy: false, rhyd: 1 } },
-    normal:   { label: 'Standard', desc: '曲調の変わり目と強いアクセントで向きを変え、強い拍で弾みます。', v: { int: 3, nov: 3, acc: true, accs: 3, low: 55, mid: 90, high: 127, pul: true, puls: 3, rhy: true, rhyd: 2 } },
-    contrast: { label: 'Dramatic', desc: '静かな所はとてもゆっくり、盛り上がりは全開。速さの差を大きくします。', v: { int: 2, nov: 3, acc: true, accs: 2, low: 26, mid: 72, high: 127, pul: true, puls: 4, rhy: true, rhyd: 3 } },
-    wild:     { label: 'Powerful', desc: '全体に速く、小さな変化やアクセントでもどんどん向きを変え、よく弾みます。', v: { int: 5, nov: 5, acc: true, accs: 5, low: 75, mid: 108, high: 127, pul: true, puls: 5, rhy: true, rhyd: 4 } }
-  };
-  var S = Object.assign({}, DEF, store('rs.opts.v1') || {});
-  function currentOpts() { var th = INT[S.int]; return { th: [-1, th[0], th[1]], speed: [S.low, S.mid, S.high], reverseTime: S.rev / 10, motorLag: S.lag / 1000, noveltyDelta: NOV[S.nov], accents: S.acc, accentPct: ACC[S.accs], minHold: 2.0, pulses: S.pul, pulsePct: PUL[S.puls][0], pulseAmt: PUL[S.puls][1], rhythm: S.rhy !== false, rhythmDuty: RHY[S.rhyd || 2] }; }
-  function syncCtl() {
-    $('a-int').value = S.int; $('a-int-v').textContent = INTN[S.int];
-    $('a-nov').value = S.nov; $('a-nov-v').textContent = LV[S.nov];
-    $('a-acc').checked = S.acc; $('a-accs').value = S.accs; $('a-accs').disabled = !S.acc; $('a-accs-v').textContent = S.acc ? LV[S.accs] : '使わない';
-    ['low', 'mid', 'high'].forEach(function (k) { $('a-' + k).value = S[k]; $('a-' + k + '-v').textContent = S[k]; });
-    $('a-rev').value = S.rev; $('a-rev-v').textContent = (S.rev / 10).toFixed(1) + ' 秒';
-    $('a-lag').value = S.lag; $('a-lag-v').textContent = S.lag + ' ms';
-    $('a-pul').checked = S.pul; $('a-puls').value = S.puls; $('a-puls').disabled = !S.pul; $('a-puls-v').textContent = S.pul ? PULN[S.puls] : '使わない';
-    $('a-rhy').checked = S.rhy !== false; $('a-rhyd').value = S.rhyd || 2; $('a-rhyd').disabled = S.rhy === false; $('a-rhyd-v').textContent = S.rhy === false ? '使わない' : RHYN[S.rhyd || 2];
-    $('a-spk').value = S.spk; $('a-spk-v').textContent = (S.spk > 0 ? '+' : '') + S.spk + ' ms';
+  // ================= 音を出す先と、ずれの調整 =================
+  // 標準：スマホのスピーカーで150ms（実機で確かめた値）。Bluetoothスピーカーは音が遅れるので、別の値を覚える
+  var S = Object.assign({ out: 'phone', leadPhone: 150, leadBt: 350 }, store('rs.sync.v1') || {});
+  function leadNow() { return S.out === 'bt' ? S.leadBt : S.leadPhone; }
+  function syncOut() {
+    document.querySelectorAll('[data-out]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.out === S.out ? 'true' : 'false'); });
+    var v = leadNow(); $('lead').value = v; $('lead-v').textContent = v + ' ms';
   }
-  ['int', 'nov', 'accs', 'low', 'mid', 'high', 'rev', 'lag', 'spk', 'puls', 'rhyd'].forEach(function (k) { $('a-' + k).addEventListener('input', function (e) { S[k] = +e.target.value; if (k !== 'rev' && k !== 'lag' && k !== 'spk') S.preset = null; syncCtl(); store('rs.opts.v1', S); }); });
-  $('a-rhy').addEventListener('change', function (e) { S.rhy = e.target.checked; S.preset = null; syncCtl(); store('rs.opts.v1', S); });
-  $('a-pul').addEventListener('change', function (e) { S.pul = e.target.checked; S.preset = null; syncCtl(); store('rs.opts.v1', S); });
-  $('a-acc').addEventListener('change', function (e) { S.acc = e.target.checked; S.preset = null; syncCtl(); store('rs.opts.v1', S); });
-  syncCtl();
-  $('btn-reset').addEventListener('click', function () { S = Object.assign({}, DEF); syncCtl(); syncPreset(); store('rs.opts.v1', S); toast('最初の設定に戻しました'); });
-  $('btn-redo').addEventListener('click', function () {
-    if (!base) return;
-    stopPlay(true);
-    res = A.remotion(base, currentOpts()); playOff = 0;
-    renderResult(); syncPreset(); show('result'); toast('振付を作り直しました（切替 ' + res.flips.length + '回）');
+  document.querySelectorAll('[data-out]').forEach(function (b) {
+    b.addEventListener('click', function () { S.out = b.dataset.out; store('rs.sync.v1', S); syncOut(); applyLead(); });
   });
-  $('btn-adjust').addEventListener('click', function () { stopPlay(false); show('adjust'); });
-  $('btn-back-result').addEventListener('click', function () { show(base ? 'result' : 'home'); });
-  $('btn-back-home').addEventListener('click', function () { stopPlay(false); show('home'); });
-
-  // ================= 演出ボタン =================
-  function syncPreset() {
-    document.querySelectorAll('[data-preset]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.preset === S.preset ? 'true' : 'false'); });
-    $('preset-desc').textContent = S.preset ? PRESETS[S.preset].desc : '調整画面で細かく変えた設定です。';
-  }
-  document.querySelectorAll('[data-preset]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      if (play.on) return;
-      var p = PRESETS[b.dataset.preset]; Object.assign(S, p.v); S.preset = b.dataset.preset; store('rs.opts.v1', S); syncCtl(); syncPreset();
-      if (!base) return;
-      res = A.remotion(base, currentOpts());          // 再生中でもそのまま新しい振付に切り替わる
-      renderResult(); sizeTimeline(); drawTimelineBase();
-      toast('演出：' + p.label + '（切替 ' + res.flips.length + '回・弾み ' + res.pulses.length + '回）');
-    });
+  $('lead').addEventListener('input', function (e) {
+    var v = +e.target.value; if (S.out === 'bt') S.leadBt = v; else S.leadPhone = v;
+    $('lead-v').textContent = v + ' ms'; store('rs.sync.v1', S);
   });
-  syncPreset();
+  $('lead').addEventListener('change', applyLead);
+  syncOut();
 
   // ================= 結果 =================
-  var STN = ['停止', '低速', '中速', '高速'], STC = ['#3A3E45', '#34D399', '#FBBF24', '#F87171'];
+  // 振付に画面用の情報を足す
+  function decorate(c) {
+    var sum = 0, u = new Uint8Array(c.cmd.buffer, c.cmd.byteOffset, c.cmd.length);
+    for (var i = 0; i < u.length; i++) sum += u[i];
+    c.sum = sum;
+    c.revCount = c.plan.ph.filter(function (p) { return p.weak; }).length + c.flips.length;
+    return c;
+  }
   function renderResult() {
     $('rs-meta').textContent = song.name + ' · ' + fmtShort(song.buf.duration) + ' · ' + Math.round(res.tempo) + ' BPM';
-    var nk = res.flips.filter(function (f) { return f.k === '曲調'; }).length;
-    $('tl-info').textContent = '切替 ' + res.flips.length + '回（曲調 ' + nk + '・アクセント ' + (res.flips.length - nk) + '）・弾み ' + (res.pulses ? res.pulses.length : 0) + '回・刻み ' + (res.rhythm ? res.rhythm.beats.length : 0) + '回';
+    $('tl-info').textContent = res.slow ? 'とてもゆっくりな曲' : '電気を切る動きが中心';
     var st = $('stats'); st.innerHTML = '';
-    [1, 2, 3].forEach(function (k) { var d = document.createElement('div'); d.className = 'stat'; d.innerHTML = '<b style="color:' + STC[k] + '">' + Math.round(res.share[k] * 100) + '%</b><span>' + STN[k] + '</span>'; st.appendChild(d); });
-    var d2 = document.createElement('div'); d2.className = 'stat'; d2.innerHTML = '<b>' + song.secs.toFixed(1) + '秒</b><span>解析時間</span>'; st.appendChild(d2);
+    [[res.eights.length + '回', '8の字'], [res.revCount + '回', '逆回転'], [res.ncut + '回', '電気を切る'], [song.secs.toFixed(1) + '秒', '解析時間']].forEach(function (x) {
+      var d = document.createElement('div'); d.className = 'stat'; d.innerHTML = '<b>' + x[0] + '</b><span>' + x[1] + '</span>'; st.appendChild(d);
+    });
     $('clock').textContent = fmt(playOff); updateChips(playOff);
   }
 
@@ -357,18 +330,20 @@
     g.fillStyle = '#16171b'; g.fillRect(0, 0, W, H);
     g.fillStyle = '#A3A7AE'; g.font = (10 * s) + 'px ' + getComputedStyle(document.body).fontFamily;
     var G = Math.round(30 * s); tlGutter = G;
-    g.fillText('速さ', 0, 44 * s); g.fillText('向き', 0, 94 * s);
-    var top = 14 * s, sh = 50 * s, dy = 82 * s, dh = 16 * s, hgt = [0, 0.33, 0.66, 1], PW = W - G;
+    g.fillText('出力', 0, 44 * s); g.fillText('向き', 0, 94 * s);
+    var top = 14 * s, sh = 50 * s, dy = 82 * s, dh = 16 * s, PW = W - G, CAPV = A.CAP * 0.35;
     for (var x = G; x < W; x++) {
-      var i = Math.min(n - 1, Math.floor((x - G) / PW * n)), stg = res.stage[i], v = res.cmd[i];
-      g.fillStyle = STC[stg]; var h = Math.max(2 * s, sh * hgt[stg]); g.fillRect(x, top + sh - h, 1, h);
-      g.fillStyle = v > 0 ? '#FF9F43' : (v < 0 ? '#3B82F6' : '#3A3E45'); g.fillRect(x, dy, 1, dh);
+      var i0 = Math.floor((x - G) / PW * n), i1 = Math.max(i0 + 1, Math.floor((x + 1 - G) / PW * n)), mx = 0, dir = 0;
+      for (var q = i0; q < i1 && q < n; q++) { var av = Math.abs(res.cmd[q]); if (av > mx) mx = av; if (!dir && res.cmd[q]) dir = res.cmd[q]; }
+      var h = Math.max(2 * s, sh * mx / CAPV);
+      g.fillStyle = mx / A.CAP > 0.3 ? '#F87171' : (mx / A.CAP > 0.2 ? '#FBBF24' : '#34D399'); g.fillRect(x, top + sh - h, 1, h);
+      g.fillStyle = dir > 0 ? '#FF9F43' : (dir < 0 ? '#3B82F6' : '#3A3E45'); g.fillRect(x, dy, 1, dh);
     }
-    res.flips.forEach(function (f) { var xx = G + Math.round(f.t * FPS / n * PW); g.fillStyle = f.k === '曲調' ? 'rgba(242,240,234,.85)' : '#FFB020'; g.fillRect(xx, top - 2 * s, Math.max(1, s), dy + dh - top + 2 * s); });
+    function mark(t, c) { g.fillStyle = c; g.fillRect(G + Math.round(t * FPS / n * PW), top - 2 * s, Math.max(1, s), dy + dh - top + 2 * s); }
+    res.flips.forEach(function (t) { mark(t, 'rgba(242,240,234,.85)'); });
+    res.eights.forEach(function (t) { mark(t, '#FFB020'); });
     g.fillStyle = '#A78BFA';
-    ((res.rhythm && res.rhythm.segs) || []).forEach(function (sg) { var x0 = G + Math.round(sg.t0 * FPS / n * PW), x1 = G + Math.round(sg.t1 * FPS / n * PW); g.fillRect(x0, top - 9 * s, Math.max(2, x1 - x0), 4 * s); });
-    g.fillStyle = 'rgba(242,240,234,.9)';
-    (res.pulses || []).forEach(function (t) { var xp = G + Math.round(t * FPS / n * PW); g.beginPath(); g.arc(xp, dy - 4 * s, 1.6 * s, 0, 2 * Math.PI); g.fill(); });
+    res.scenes.forEach(function (sg) { if (!sg.weak) return; var x0 = G + Math.round(sg.a * FPS / n * PW), x1 = G + Math.round(sg.b * FPS / n * PW); g.fillRect(x0, top - 9 * s, Math.max(2, x1 - x0), 4 * s); });
     g.fillStyle = '#A3A7AE'; g.font = (10 * s) + 'px JetBrains Mono, monospace';
     var dur = n / FPS, step = dur > 400 ? 120 : (dur > 150 ? 60 : 30);
     for (var t = 0; t <= dur; t += step) { var xt = G + t / dur * PW; g.fillText(fmtShort(t), Math.min(xt, W - 30 * s), 114 * s); }
@@ -387,31 +362,116 @@
   });
   window.addEventListener('resize', function () { if (cur === 'result') { sizeTimeline(); drawTimelineBase(); } });
 
-  // ================= 再生とスタート信号（基板はシミュレーション） =================
-  var play = { on: false }, playOff = 0, wake = null, paused = false;   // paused＝一時停止中（曲の途中。基板の振付はそのまま）
-  // 予約した時刻（音を出す処理の時刻）をスマホの時計に直す。ここにスピーカーの遅れを足した時刻に音が聞こえる
-  function ctxToPerf(ct) { return performance.now() + (ct - ctx.currentTime) * 1000; }
-  function startPlay() {
-    if (!song) return;
-    setDemo(null);
-    var ac = getCtx();
-    if (playOff >= song.buf.duration - 0.05) playOff = 0;
-    var src = ac.createBufferSource(); src.buffer = song.buf; src.connect(ac.destination);
-    var lead = 0.3, when = ac.currentTime + lead;
-    src.start(when, playOff);
-    var autoLat = (ac.outputLatency || ac.baseLatency || 0) * 1000, lat = Math.max(0, autoLat + S.spk);
-    var sigPerf = ctxToPerf(when);
-    play = { on: true, src: src, when: when, off: playOff, sigPerf: sigPerf, boardStart: sigPerf + lat, autoLat: autoLat, lat: lat, clickPerf: performance.now() };
-    src.onended = function () { if (play.src === src && play.on) { var endPos = audioPos(); if (endPos >= song.buf.duration - 0.2) { play.on = false; playOff = 0; paused = false; setPlayIcon(false); $('chip-dir').textContent = '終了'; } } };
-    $('sy-sig').textContent = '予約 ' + Math.round(lead * 1000) + ' ms後・' + fmt(playOff) + 'から';
-    $('sy-lat').textContent = Math.round(autoLat) + (S.spk ? (S.spk > 0 ? ' + ' : ' − ') + Math.abs(S.spk) : '') + ' ms';
-    setPlayIcon(true);
-    try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () { }); } catch (e) { }
+  // ================= 基板の状態と記録 =================
+  var bdFailed = false, logLines = [];
+  function bdLog(msg, err) {
+    var at = play && play.on ? fmtShort(Math.max(0, audioPos())) + ' ' : '';
+    logLines.unshift({ t: at + msg, err: !!err }); logLines = logLines.slice(0, 40);
+    var w = $('bd-log'); w.innerHTML = '';
+    logLines.forEach(function (l) { var d = document.createElement('div'); d.textContent = l.t; if (l.err) d.className = 'bd-err'; w.appendChild(d); });
+  }
+  function bdState(st, msg) {
+    $('boardbar').dataset.st = st;
+    if (msg) $('bd-txt').textContent = msg;
+    else $('bd-txt').textContent = st === 'on' ? '基板につながっています' : (st === 'busy' ? 'つないでいます…' : '基板につながっていません');
+    var b = $('bd-btn'); b.disabled = st === 'busy'; b.textContent = st === 'on' ? '接続を切る' : '基板につなぐ';
+    $('t-right').disabled = $('t-left').disabled = st !== 'on';
+  }
+  Board.onState = function (st, msg) {
+    bdState(st, msg);
+    if (st === 'off' && msg && !/切りました|やめました/.test(msg)) bdFailed = true;
+    if (st === 'on') { bdFailed = false; if (res) ensureLoaded().catch(function (e) { bdLog(e.message, true); }); }
+  };
+  Board.onLog = function (m) { bdLog(m); };
+  Board.onLine = function (x) {
+    if (x === 'END') bdLog('基板：振付の終わり');
+    else if (x === 'NG') bdLog('基板：データを受け取れませんでした', true);
+  };
+  Board.onLost = function () {
+    if (play.on) { bdLog('再生中にBluetoothが切れました。音楽も止めます', true); stopPlay(false); }
+    setTimeout(function () { if (Board.state === 'off') Board.connect(false); }, 1500);   // 基板が再起動した時など、1回だけつなぎ直す
+  };
+  $('bd-btn').addEventListener('click', function () {
+    if (Board.state === 'on') { stopPlay(false); Board.disconnect(); return; }
+    if (!Board.available()) { $('bd-txt').textContent = 'この画面では基板につなげません（Androidアプリで使えます）'; return; }
+    Board.connect(bdFailed || !localStorageHasBoard());
+  });
+  function localStorageHasBoard() { try { return !!localStorage.getItem('rs.board.id'); } catch (e) { return false; } }
+  bdState('off');
+  if (Board.available() && localStorageHasBoard()) Board.connect(false);
+
+  function ensureLoaded() {
+    if (!res) return Promise.resolve();
+    var name = song.name;
+    return Board.load(res.cmd, res.key, function (p) { bdState('on', '振付を送っています ' + Math.round(p * 100) + '%'); })
+      .then(function (sent) { if (sent) bdState('on', '振付を送りました：' + name); });
+  }
+  function testRun(sign) {
+    if (Board.state !== 'on') return;
+    stopPlay(true);
+    var v = Math.round(A.CAP * 0.28) * sign, d = new Int8Array(100).fill(v); d[99] = 0;
+    bdLog((sign > 0 ? '右' : '左') + 'に2秒回します');
+    Board.testRun(d).catch(function (e) { bdLog(e.message, true); });
+  }
+  $('t-right').addEventListener('click', function () { testRun(1); });
+  $('t-left').addEventListener('click', function () { testRun(-1); });
+
+  // ================= 再生とスタート =================
+  var play = { on: false }, playOff = 0, wake = null, paused = false, starting = false;
+  // 音の時計（ctx.currentTime）は飛び飛びに進むので、何度か読んで一番ずれの小さい対応を使う
+  function ctxMapping(ac) {
+    return new Promise(function (ok) {
+      var best = Infinity, n = 0;
+      (function f() {
+        var d = performance.now() - ac.currentTime * 1000; if (d < best) best = d;
+        if (++n >= 25) ok(best); else setTimeout(f, 4);
+      })();
+    });
+  }
+  async function startPlay() {
+    if (!song || starting) return;
+    starting = true;
+    try {
+      var ac = getCtx(), useBoard = Board.state === 'on';
+      try { await ac.resume(); } catch (e) { }
+      if (playOff >= song.buf.duration - 0.05) playOff = 0;
+      if (useBoard) {
+        $('sy-sig').textContent = '準備中';
+        await ensureLoaded();
+        var ck = await Board.syncClock();
+        $('sy-clock').textContent = ck.rtt.toFixed(0) + ' ms';
+      }
+      var map = await ctxMapping(ac), lead = leadNow(), wait = Math.max(0.4, lead / 1000 + 0.3);
+      var src = ac.createBufferSource(); src.buffer = song.buf; src.connect(ac.destination);
+      var when = ac.currentTime + wait, off = playOff;
+      src.start(when, off);
+      var autoLat = (ac.outputLatency || ac.baseLatency || 0) * 1000, heard = when * 1000 + map + autoLat, motor = heard - lead;
+      play = { on: true, src: src, when: when, off: off, heard: heard, boardStart: motor, autoLat: autoLat, useBoard: useBoard };
+      src.onended = function () {
+        if (play.src === src && play.on && audioPos() >= song.buf.duration - 0.3) { play.on = false; playOff = 0; paused = false; setPlayIcon(false); $('chip-dir').textContent = '終了'; }
+      };
+      $('sy-sig').textContent = Math.round(wait * 1000) + ' ms後・' + fmt(off) + 'から';
+      $('sy-lat').textContent = Math.round(autoLat) + ' ms';
+      setPlayIcon(true);
+      try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () { }); } catch (e) { }
+      if (useBoard) await Board.startAt(motor, Math.round(off * FPS));
+    } catch (e) {
+      bdLog((e && e.message) || '基板を動かせませんでした', true);
+      toast((e && e.message) || '基板を動かせませんでした');
+      stopPlay(false);
+    } finally { starting = false; }
+  }
+  // 再生中にずれを変えたら、基板の開始時刻を直して送る
+  function applyLead() {
+    if (!play.on) return;
+    play.boardStart = play.heard - leadNow();
+    if (play.useBoard && Board.state === 'on') Board.startAt(play.boardStart, Math.round(play.off * FPS)).catch(function (e) { bdLog(e.message, true); });
   }
   function stopPlay(reset) {
     if (play.on) { playOff = Math.max(0, Math.min(song ? song.buf.duration : 0, audioPos())); try { play.src.stop(); } catch (e) { } paused = true; }
     if (reset) { playOff = 0; paused = false; }
     play.on = false; setPlayIcon(false);
+    Board.stop();
     if (wake) { try { wake.release(); } catch (e) { } wake = null; }
   }
   // いま聞こえている音の位置（端末が報告する「出力中の時刻」から求める）
@@ -422,27 +482,25 @@
   }
   function boardPos(now) { return play.off + (now - play.boardStart) / 1000; }
   function setPlayIcon(on) {
-    // 曲の途中は振付（基板へ転送済み）を変えられないようにする
-    // 一時停止中も同じ振付の続きから再開するので変更不可。STOP（曲の初めへ）か曲の終わりで解除
-    var lock = on || paused;
-    document.querySelectorAll('[data-preset]').forEach(function (b) { b.disabled = lock; });
-    $('btn-adjust').disabled = lock;
-    $('preset-lock').hidden = !lock;
     $('lbl-play').textContent = on ? 'PAUSE' : 'PLAY';
     $('btn-play').setAttribute('aria-pressed', on ? 'true' : 'false');
-    $('ico-play').toggleAttribute('hidden', on); $('ico-pause').toggleAttribute('hidden', !on); $('btn-play').setAttribute('aria-label', on ? '一時停止（基板へ停止信号）' : '再生（基板へスタート信号）'); }
+    $('ico-play').toggleAttribute('hidden', on); $('ico-pause').toggleAttribute('hidden', !on); $('btn-play').setAttribute('aria-label', on ? '一時停止' : '再生'); }
   $('btn-play').addEventListener('click', function () { if (play.on) stopPlay(false); else startPlay(); });
-  $('btn-rewind').addEventListener('click', function () { setDemo(null); stopPlay(true); $('clock').textContent = fmt(0); var cd = $('chip-dir'); cd.textContent = '停止'; cd.style.background = '#2A2D33'; cd.style.color = 'var(--soft)'; $('chip-spd').hidden = true; toast('停止して曲の初めに戻りました'); });
+  $('btn-rewind').addEventListener('click', function () { stopPlay(true); $('clock').textContent = fmt(0); var cd = $('chip-dir'); cd.textContent = '停止'; cd.style.background = '#2A2D33'; cd.style.color = 'var(--soft)'; $('chip-spd').hidden = true; toast('停止して曲の初めに戻りました'); });
 
+  function sceneAt(pos) {
+    for (var e = 0; e < res.eights.length; e++) if (pos >= res.eights[e] - 0.05 && pos <= res.eights[e] + 1.6) return '8の字';
+    for (var i = 0; i < res.scenes.length; i++) if (pos >= res.scenes[i].a && pos < res.scenes[i].b) return res.scenes[i].weak ? '逆回転' : '電気を切る';
+    return '';
+  }
   function updateChips(pos, waiting) {
     if (!res) return;
-    var i = Math.max(0, Math.min(res.cmd.length - 1, Math.floor(pos * FPS))), v = res.cmd[i], stg = res.stage[i];
+    var i = Math.max(0, Math.min(res.cmd.length - 1, Math.floor(pos * FPS))), v = res.cmd[i];
     var cd = $('chip-dir'), cs = $('chip-spd');
     if (waiting) { cd.textContent = '音を待っています'; cd.style.background = '#2A2D33'; cd.style.color = 'var(--soft)'; cs.hidden = true; return; }
-    var inR = false; ((res.rhythm && res.rhythm.segs) || []).forEach(function (sg) { if (pos >= sg.t0 - 0.1 && pos <= sg.t1 + 0.5) inR = true; });
-    if (v === 0) { cd.textContent = inR ? '電気オフ（惰性）' : '反転中'; cd.style.background = '#2A2D33'; cd.style.color = 'var(--soft)'; }
-    else { cd.textContent = v > 0 ? '右回転' : '左回転'; cd.style.background = v > 0 ? '#FF9F43' : '#3B82F6'; cd.style.color = v > 0 ? '#121316' : '#fff'; }
-    cs.hidden = false; cs.textContent = STN[stg]; cs.style.background = '#26292F'; cs.style.color = STC[stg];
+    if (v === 0) { cd.textContent = '電気オフ（惰性）'; cd.style.background = '#2A2D33'; cd.style.color = 'var(--soft)'; }
+    else { cd.textContent = (v > 0 ? '右回転 ' : '左回転 ') + Math.round(Math.abs(v) / A.CAP * 100) + '%'; cd.style.background = v > 0 ? '#FF9F43' : '#3B82F6'; cd.style.color = v > 0 ? '#121316' : '#fff'; }
+    var sc = sceneAt(pos); cs.hidden = !sc; cs.textContent = sc; cs.style.background = '#26292F'; cs.style.color = sc === '8の字' ? '#B45309' : '#047857';
   }
 
   // 仮想Rainbow Stick
@@ -501,22 +559,6 @@
     }
   }
 
-  // ================= 動きの確認（音なし） =================
-  var demo = null, DEMO_LEN = { low: 5, mid: 5, high: 6, rev: 8, pulse: 6, tick: 7 };
-  function demoTarget(d, t) {
-    var lv = { low: S.low / 127, mid: S.mid / 127, high: S.high / 127 };
-    if (lv[d.type] !== undefined) return lv[d.type];
-    if (d.type === 'rev') { var seg = Math.floor(t / 2.6), ph = t - seg * 2.6, sgn = seg % 2 ? -1 : 1, rv = S.rev / 10; if (ph < rv / 2 && seg > 0) return -sgn * lv.high * (1 - ph / (rv / 2)); if (ph < rv && seg > 0) return sgn * lv.high * ((ph - rv / 2) / (rv / 2)); return sgn * lv.high; }
-    if (d.type === 'tick') { var pr = 0.5, ph2 = t % pr; return ph2 < pr * RHY[S.rhyd || 2] ? lv.mid : 0; }
-    if (d.type === 'pulse') { var bt = t % 0.5, amt = PUL[S.puls][1] / 127; return Math.min(1, lv.mid + (bt < 0.16 ? amt * (1 - bt / 0.16) : 0)); }
-    return 0;
-  }
-  function setDemo(type) {
-    document.querySelectorAll('[data-demo]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.demo === type ? 'true' : 'false'); });
-    demo = type ? { type: type, t0: performance.now() } : null;
-  }
-  document.querySelectorAll('[data-demo]').forEach(function (b) { b.addEventListener('click', function () { if (play.on) stopPlay(false); setDemo(demo && demo.type === b.dataset.demo ? null : b.dataset.demo); }); });
-
   // ================= 書き出し（zip：.bin と .csv） =================
   function zip(files) {
     var enc = new TextEncoder(), parts = [], cent = [], off = 0;
@@ -538,8 +580,8 @@
   $('btn-export').addEventListener('click', async function () {
     if (!res) return;
     var stem = song.name.replace(/\.[^.]+$/, '').replace(/[\\/:*?"<>|]/g, '_');
-    var lines = ['時間[秒],音の強さ(0-1),速さ段階,向き,出力値(-127〜127)'];
-    for (var i = 0; i < res.cmd.length; i++) { var v = res.cmd[i]; lines.push((i / FPS).toFixed(2) + ',' + res.level[i].toFixed(3) + ',' + STN[res.stage[i]] + ',' + (v > 0 ? '右' : (v < 0 ? '左' : '電気オフ(惰性)')) + ',' + v); }
+    var lines = ['時間[秒],向き,出力(%),基板へ送る値'];
+    for (var i = 0; i < res.cmd.length; i++) { var v = res.cmd[i]; lines.push((i / FPS).toFixed(2) + ',' + (v > 0 ? '右' : (v < 0 ? '左' : '電気オフ(惰性)')) + ',' + (Math.abs(v) / A.CAP * 100).toFixed(1) + ',' + v); }
     var csv = new Uint8Array([0xEF, 0xBB, 0xBF].concat(Array.from(new TextEncoder().encode(lines.join('\r\n')))));
     var blob = zip([{ name: stem + '_motion.bin', data: A.toBin(res.cmd, song.name) }, { name: stem + '_motion.csv', data: csv }]);
     // Androidアプリ：スマホの「Documents/RainbowDanceStudio」フォルダに保存
@@ -573,7 +615,7 @@
         pos = Math.max(0, ap);
         if (bp < play.off) { updateChips(play.off, true); $('sy-board').textContent = '待機 ' + Math.round((play.off - bp) * 1000) + ' ms'; }
         else {
-          var i = Math.min(res.cmd.length - 1, Math.floor(bp * FPS)); target = res.cmd[i] / 127; updateChips(bp);
+          var i = Math.min(res.cmd.length - 1, Math.floor(bp * FPS)); target = res.cmd[i] / (A.CAP * 0.35) * 0.9; updateChips(bp);
           $('sy-board').textContent = fmt(bp);
         }
         $('sy-audio').textContent = ap < play.off ? '— 音が出る前' : fmt(ap);
@@ -583,11 +625,6 @@
         mPlay.set(ap >= 0 ? song.ch[0][ci] : -60, ap >= 0 ? song.ch[1][ci] : -60, dt, now);
       } else {
         mPlay.set(-60, -60, dt, now);
-        if (demo) {
-          var dtm = (now - demo.t0) / 1000;
-          if (dtm > DEMO_LEN[demo.type]) setDemo(null);
-          else { target = demoTarget(demo, dtm); var cd = $('chip-dir'); cd.textContent = target > 0 ? '右回転' : (target < 0 ? '左回転' : '反転中'); cd.style.background = target > 0 ? '#FF9F43' : (target < 0 ? '#3B82F6' : '#2A2D33'); cd.style.color = target > 0 ? '#121316' : '#fff'; $('chip-spd').hidden = false; $('chip-spd').textContent = '確認中'; $('chip-spd').style.color = 'var(--soft)'; }
-        }
       }
       drawStick(dt, target);
       drawTimeline(pos);
@@ -599,8 +636,7 @@
   try {
     var CapApp = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
     if (CapApp) CapApp.addListener('backButton', function () {
-      if (cur === 'adjust') show('result');
-      else if (cur === 'result') { stopPlay(false); show('home'); }
+      if (cur === 'result') { stopPlay(false); show('home'); }
       else if (cur === 'analyze') { cancelled = true; show(song ? 'result' : 'home'); }
       else CapApp.exitApp();
     });

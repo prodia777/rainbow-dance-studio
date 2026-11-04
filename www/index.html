@@ -165,18 +165,35 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 .lv i:nth-child(1){height:5px}.lv i:nth-child(2){height:8px}.lv i:nth-child(3){height:12px}.lv i:nth-child(4){height:16px}
 .lv[data-n="1"] i:nth-child(-n+1),.lv[data-n="2"] i:nth-child(-n+2),.lv[data-n="3"] i:nth-child(-n+3),.lv[data-n="4"] i:nth-child(-n+4){background:currentColor!important}
 @media (prefers-reduced-motion: reduce){.bar>i{transition:none}}
+
+.boardbar{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:16px}
+.bd-dot{width:10px;height:10px;border-radius:5px;background:#5A5F68;flex:none}
+.boardbar[data-st="on"] .bd-dot{background:#34D399;box-shadow:0 0 8px #34D399}
+.boardbar[data-st="busy"] .bd-dot{background:#FBBF24}
+.bd-txt{flex:1;min-width:0;font-size:13px;line-height:1.4;color:var(--soft)}
+.bd-btn{flex:none;min-height:40px;padding:0 12px;border:none;border-radius:10px;font:inherit;font-size:13px;font-weight:700;color:#121316;background:linear-gradient(180deg,#FFFFFF 0%,#E3E6EA 100%);box-shadow:inset 0 1px 0 #fff,0 2px 0 #6E737C;cursor:pointer}
+.bd-btn:disabled{opacity:.5}
+.seg button:disabled{opacity:.45;cursor:default}
+.bd-log{font-family:var(--f-mono);font-size:11px;line-height:1.6;color:var(--soft);max-height:150px;overflow-y:auto;overflow-wrap:anywhere}
+.bd-err{color:#FF8A80}
 </style>
 
 </head>
 <body>
 <div class="app">
 
+<div class="boardbar" id="boardbar">
+  <span class="bd-dot" id="bd-dot" aria-hidden="true"></span>
+  <span class="bd-txt" id="bd-txt" role="status">基板につながっていません</span>
+  <button class="bd-btn" id="bd-btn" type="button">基板につなぐ</button>
+</div>
+
 <!-- 1 曲を選ぶ -->
 <section class="screen" id="scr-home">
   <div style="display:flex;flex-direction:column;gap:8px">
     <div class="eyebrow">RAINBOW STICK</div>
     <h1>Rainbow Dance Studio</h1>
-    <p class="lead">MP3を選ぶと、曲調の変わり目とリズムに合わせて回る振付を自動で作ります。</p>
+    <p class="lead">曲を選ぶと、リズムと曲調に合わせて回る振付を自動で作り、Rainbow Stickを音楽に合わせて動かします。</p>
   </div>
   <div class="card" style="gap:16px">
     <div id="meter-home"></div>
@@ -243,16 +260,20 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
     </div>
   </div>
 
-  <div style="display:flex;flex-direction:column;gap:8px">
-    <span class="muted">演出（動きのコントラスト）</span>
-    <div class="seg" id="preset" role="group" aria-label="演出" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr))">
-      <button type="button" data-preset="calm" aria-pressed="false"><span class="lv" data-n="1" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Relax</button>
-      <button type="button" data-preset="normal" aria-pressed="false"><span class="lv" data-n="2" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Standard</button>
-      <button type="button" data-preset="contrast" aria-pressed="false"><span class="lv" data-n="3" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Dramatic</button>
-      <button type="button" data-preset="wild" aria-pressed="false"><span class="lv" data-n="4" aria-hidden="true"><i></i><i></i><i></i><i></i></span>Powerful</button>
+  <div class="card" style="gap:12px">
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font-size:14px;font-weight:700">音を出す先</span>
+      <div class="seg" role="group" aria-label="音を出す先" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr))">
+        <button type="button" data-out="phone" aria-pressed="true">スマホのスピーカー</button>
+        <button type="button" data-out="bt" aria-pressed="false">Bluetoothスピーカー</button>
+      </div>
     </div>
-    <p class="muted" id="preset-desc" style="font-size:12px"></p>
-    <p id="preset-lock" hidden style="font-size:12px;color:#FBBF24;display:flex;gap:6px;align-items:center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>再生中・一時停止中は振付が基板に送られているため、演出と調整は変更できません。STOP（曲の初めに戻る）を押すと変更できます。</p>
+    <div class="ctl">
+      <div class="ctl-h"><label for="lead">モーターを音より先に動かす</label><span class="v" id="lead-v">150 ms</span></div>
+      <input id="lead" type="range" min="-200" max="800" step="10" value="150">
+      <div class="ends"><span>動きが早いとき</span><span>動きが遅れるとき</span></div>
+      <p class="muted" style="font-size:12px;margin:0">再生中に動かすと、指を離した時にすぐ反映されます。値は音を出す先ごとに覚えます。</p>
+    </div>
   </div>
 
   <div class="stage-card">
@@ -272,14 +293,10 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
   </div>
 
   <div style="display:flex;flex-direction:column;gap:8px">
-    <span class="muted">動きを確かめる（音なし）</span>
-    <div class="seg" id="demo" role="group" aria-label="動きを確かめる" style="flex-wrap:wrap">
-      <button type="button" data-demo="low" aria-pressed="false">低速</button>
-      <button type="button" data-demo="mid" aria-pressed="false">中速</button>
-      <button type="button" data-demo="high" aria-pressed="false">高速</button>
-      <button type="button" data-demo="rev" aria-pressed="false">反転</button>
-      <button type="button" data-demo="pulse" aria-pressed="false">弾む</button>
-      <button type="button" data-demo="tick" aria-pressed="false">刻む</button>
+    <span class="muted">基板を試す（音なし・28%で2秒）</span>
+    <div class="seg" role="group" aria-label="基板を試す" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr))">
+      <button type="button" id="t-right" disabled>右に回す</button>
+      <button type="button" id="t-left" disabled>左に回す</button>
     </div>
   </div>
 
@@ -287,98 +304,42 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 
   <div class="card" style="padding:14px 14px 12px;gap:8px">
     <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:14px;font-weight:700">振付のタイムライン</span><span class="muted" style="font-size:12px" id="tl-info"></span></div>
-    <canvas class="tl" id="tl" height="240" aria-label="速さと向きのタイムライン。タップした位置から再生します"></canvas>
+    <canvas class="tl" id="tl" height="240" aria-label="出力と向きのタイムライン。タップした位置から再生します"></canvas>
     <div class="legend">
       <span><i style="background:var(--right)"></i>右回転</span><span><i style="background:var(--left)"></i>左回転</span>
-      <span><i style="background:#F2F0EA;width:2px"></i>曲調の変わり目</span><span><i style="background:#FFB020;width:2px"></i>強いアクセント</span><span><i style="background:#A78BFA;height:4px"></i>リズムを刻む場面</span>
+      <span><i style="background:#F2F0EA;width:2px"></i>曲調の変わり目（逆回転）</span><span><i style="background:#FFB020;width:2px"></i>8の字</span><span><i style="background:#A78BFA;height:4px"></i>ゆっくり逆回転の場面</span>
     </div>
   </div>
 
   <div class="stats" id="stats"></div>
 
   <div class="sync" id="sync" aria-live="off">
-    <span>基板へのスタート信号</span><b id="sy-sig">—</b>
-    <span>スピーカーの遅れ（自動＋補正）</span><b id="sy-lat">—</b>
-    <span>基板の時計で進む位置</span><b id="sy-board">—</b>
+    <span>スタートの予約</span><b id="sy-sig">—</b>
+    <span>基板との時計合わせ（往復）</span><b id="sy-clock">—</b>
+    <span>スピーカーの遅れ（端末の報告）</span><b id="sy-lat">—</b>
+    <span>モーターの位置</span><b id="sy-board">—</b>
     <span>聞こえている音の位置</span><b id="sy-audio">—</b>
-    <span>ずれ</span><b id="sy-diff">—</b>
+    <span>モーターの先行</span><b id="sy-diff">—</b>
   </div>
 
-  <div class="row">
-    <button class="btn btn-ghost" id="btn-adjust" type="button">調整する</button>
-    <button class="btn btn-primary" id="btn-export" type="button" style="flex:1.4">データを書き出す</button>
+  <div class="card" style="padding:12px 14px;gap:6px">
+    <span style="font-size:14px;font-weight:700">基板の記録</span>
+    <div class="bd-log" id="bd-log"><span class="muted">まだ記録はありません</span></div>
   </div>
+
+  <button class="btn btn-primary" id="btn-export" type="button">データを書き出す</button>
   <label class="btn btn-ghost" for="file-mp3">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
     次の曲を選ぶ
   </label>
-  <p class="muted" style="text-align:center">基板が届いたら、ここから基板へ動きデータとスタート信号を送ります。今は画面の仮想スティックが基板の代わりです。</p>
-</section>
-
-<!-- 4 調整 -->
-<section class="screen" id="scr-adjust" hidden>
-  <div class="topbar">
-    <button class="icon-btn" id="btn-back-result" type="button" aria-label="結果へ戻る"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
-    <h1 style="font-size:20px">振付を調整</h1>
-  </div>
-
-  <div class="card">
-    <div class="ctl"><div class="ctl-h"><label for="a-int">動きの激しさ</label><span class="v" id="a-int-v"></span></div>
-      <input id="a-int" type="range" min="1" max="5" step="1" value="3"><div class="ends"><span>おだやか</span><span>はげしい</span></div></div>
-  </div>
-
-  <div class="card">
-    <span style="font-size:15px;font-weight:700">向きを変えるタイミング</span>
-    <div class="ctl"><div class="ctl-h"><label for="a-nov">曲調の変わり目の感度</label><span class="v" id="a-nov-v"></span></div>
-      <input id="a-nov" type="range" min="1" max="5" step="1" value="3"><div class="ends"><span>大きな変化だけ</span><span>小さな変化でも</span></div></div>
-    <div class="sw"><label for="a-acc" style="font-weight:700">強いアクセントでも切り替える</label><input id="a-acc" type="checkbox" checked></div>
-    <div class="ctl"><div class="ctl-h"><label for="a-accs">アクセントの感度</label><span class="v" id="a-accs-v"></span></div>
-      <input id="a-accs" type="range" min="1" max="5" step="1" value="3"><div class="ends"><span>特に強い音だけ</span><span>強めの音でも</span></div></div>
-    <p class="muted">静かな部分では向きを変えず、ゆっくり一方向に回ります。</p>
-  </div>
-
-  <div class="card">
-    <div class="sw"><label for="a-pul" style="font-weight:700">強い拍で弾む</label><input id="a-pul" type="checkbox" checked></div>
-    <div class="ctl"><div class="ctl-h"><label for="a-puls">弾み方</label><span class="v" id="a-puls-v"></span></div>
-      <input id="a-puls" type="range" min="1" max="5" step="1" value="3"><div class="ends"><span>控えめ</span><span>大きく・多く</span></div></div>
-    <p class="muted">強い拍で短く加速します。高速で回っているときは、一瞬ゆるめてから戻します。基板のモーターも同じ動きをします。</p>
-  </div>
-
-  <div class="card">
-    <div class="sw"><label for="a-rhy" style="font-weight:700">一定のテンポの場面はオン・オフでリズムを刻む</label><input id="a-rhy" type="checkbox" checked></div>
-    <div class="ctl"><div class="ctl-h"><label for="a-rhyd">刻み方</label><span class="v" id="a-rhyd-v"></span></div>
-      <input id="a-rhyd" type="range" min="1" max="5" step="1" value="2"><div class="ends"><span>やわらかく</span><span>くっきり</span></div></div>
-    <p class="muted">拍ごとにモーターの電気を入れたり切ったりします。切っている間も球体は惰性で回り続けるので、回転が拍に合わせて脈打つように見えます。くっきりにするほど切る時間が長くなります。</p>
-  </div>
-
-  <div class="card">
-    <div class="ctl-h"><span class="t">速さ</span><span class="muted" style="font-size:12px">上限は3V相当</span></div>
-    <div class="three"><label for="a-low" style="color:var(--low)">低速</label><input id="a-low" type="range" min="20" max="127" value="55"><span class="mono" id="a-low-v" style="text-align:right">55</span></div>
-    <div class="three"><label for="a-mid" style="color:var(--mid)">中速</label><input id="a-mid" type="range" min="20" max="127" value="90"><span class="mono" id="a-mid-v" style="text-align:right">90</span></div>
-    <div class="three"><label for="a-high" style="color:var(--high)">高速</label><input id="a-high" type="range" min="20" max="127" value="127"><span class="mono" id="a-high-v" style="text-align:right">127</span></div>
-  </div>
-
-  <div class="card">
-    <div class="ctl"><div class="ctl-h"><label for="a-rev">反転にかかる時間</label><span class="v" id="a-rev-v"></span></div>
-      <input id="a-rev" type="range" min="3" max="12" step="1" value="6"></div>
-    <div class="ctl"><div class="ctl-h"><label for="a-lag">モーターの反応の遅れ</label><span class="v" id="a-lag-v"></span></div>
-      <input id="a-lag" type="range" min="0" max="200" step="10" value="80"></div>
-    <div class="ctl"><div class="ctl-h"><label for="a-spk">スピーカーの遅れの補正</label><span class="v" id="a-spk-v"></span></div>
-      <input id="a-spk" type="range" min="-200" max="400" step="10" value="0"></div>
-    <p class="muted">反転の時間とモーターの遅れは、基板の試作で測った値に合わせます。スピーカーの補正は再生時だけに使い、動きデータは変わりません。</p>
-  </div>
-
-  <div class="row">
-    <button class="btn btn-ghost" id="btn-reset" type="button">元に戻す</button>
-    <button class="btn btn-primary" id="btn-redo" type="button" style="flex:1.6">この設定で作り直す</button>
-  </div>
 </section>
 
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>window.RS_SAMPLES=['jupiter'];</script>
-<script src="analyzer.js"></script>
+<script src="choreo.js"></script>
+<script src="board.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
