@@ -238,6 +238,31 @@
       w.appendChild(b);
     });
   })();
+  // ずれの確認：1秒ごとのクリック音に合わせて、振付と同じ動き（拍の直前に電気を切り、拍で入れ直す）をする
+  function openSyncTest() {
+    stopPlay(true);
+    var ac = getCtx(), DUR = 60, sr = ac.sampleRate, buf = ac.createBuffer(1, DUR * sr, sr), d = buf.getChannelData(0), b, i;
+    for (b = 1; b < DUR; b++) {
+      var i0 = b * sr, n = Math.round(0.04 * sr), hi = b % 4 === 1, f = hi ? 1760 : 1320, g = hi ? 0.9 : 0.6;
+      for (i = 0; i < n; i++) d[i0 + i] = g * Math.sin(2 * Math.PI * f * i / sr) * (1 - i / n);
+    }
+    var N = DUR * FPS, cmd = new Int8Array(N), base = Math.trunc(A.CAP * 0.22), kick = Math.trunc(A.CAP * 0.26), start = Math.trunc(A.CAP * 0.28);
+    cmd.fill(base);
+    for (i = 0; i < 20; i++) cmd[i] = start;
+    for (b = 1; b < DUR; b++) {
+      var at = b * FPS;
+      for (i = at - 8; i < at; i++) cmd[i] = 0;
+      for (i = at; i < at + 5; i++) cmd[i] = kick;
+    }
+    cmd[N - 1] = 0;
+    res = decorate({ cmd: cmd, ncut: DUR - 1, eights: [], flips: [], scenes: [{ a: 0, b: DUR, kind: '電気を切る', weak: false, big: false }], tempo: 60, slow: false, plan: { ph: [] }, info: '音と動きのずれの確認' });
+    res.key = 'sync-test|' + res.sum;
+    song = { name: 'ずれの確認（1秒ごとのクリック音）', buf: buf, ch: channelDb(buf), secs: 0 };
+    playOff = 0; paused = false;
+    renderResult(); show('result');
+    if (Board.state === 'on') ensureLoaded().catch(function (e) { bdLog(e.message, true); });
+  }
+  $('btn-sync-test').addEventListener('click', openSyncTest);
   $('btn-cancel').addEventListener('click', function () { cancelled = true; show(song ? 'result' : 'home'); });
 
   function makeSample(ac) {
@@ -311,7 +336,7 @@
   }
   function renderResult() {
     $('rs-meta').textContent = song.name + ' · ' + fmtShort(song.buf.duration) + ' · ' + Math.round(res.tempo) + ' BPM';
-    $('tl-info').textContent = res.slow ? 'とてもゆっくりな曲' : '電気を切る動きが中心';
+    $('tl-info').textContent = res.info ? res.info : res.slow ? 'とてもゆっくりな曲' : '電気を切る動きが中心';
     var st = $('stats'); st.innerHTML = '';
     [[res.eights.length + '回', '8の字'], [res.revCount + '回', '逆回転'], [res.ncut + '回', '電気を切る'], [song.secs.toFixed(1) + '秒', '解析時間']].forEach(function (x) {
       var d = document.createElement('div'); d.className = 'stat'; d.innerHTML = '<b>' + x[0] + '</b><span>' + x[1] + '</span>'; st.appendChild(d);
@@ -454,7 +479,7 @@
       $('sy-lat').textContent = Math.round(autoLat) + ' ms';
       setPlayIcon(true);
       try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }).catch(function () { }); } catch (e) { }
-      if (useBoard) await Board.startAt(motor, Math.round(off * FPS));
+      if (useBoard) { await Board.startAt(motor, Math.round(off * FPS)); bdLog('開始：モーターの先行 ' + lead + ' ms／端末の報告する遅れ ' + Math.round(autoLat) + ' ms／往復 ' + Math.round(Board.rtt) + ' ms'); }
     } catch (e) {
       bdLog((e && e.message) || '基板を動かせませんでした', true);
       toast((e && e.message) || '基板を動かせませんでした');
@@ -464,8 +489,17 @@
   // 再生中にずれを変えたら、基板の開始時刻を直して送る
   function applyLead() {
     if (!play.on) return;
-    play.boardStart = play.heard - leadNow();
-    if (play.useBoard && Board.state === 'on') Board.startAt(play.boardStart, Math.round(play.off * FPS)).catch(function (e) { bdLog(e.message, true); });
+    var lead = leadNow(), mine = play;
+    play.boardStart = play.heard - lead;
+    if (!play.useBoard || Board.state !== 'on') return;
+    // 曲の出だしで開始時刻より前に送らないよう、必要なら少し待つ
+    var wait = Math.max(0, play.boardStart + 60 - performance.now());
+    setTimeout(function () {
+      if (play !== mine || !play.on || Board.state !== 'on') return;
+      Board.startAt(play.boardStart, Math.round(play.off * FPS))
+        .then(function () { bdLog('ずれの調整 ' + leadNow() + ' ms を基板へ送りました'); })
+        .catch(function (e) { bdLog(e.message, true); });
+    }, wait);
   }
   function stopPlay(reset) {
     if (play.on) { playOff = Math.max(0, Math.min(song ? song.buf.duration : 0, audioPos())); try { play.src.stop(); } catch (e) { } paused = true; }

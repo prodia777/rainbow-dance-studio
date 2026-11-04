@@ -214,6 +214,7 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
     <h2>サンプル曲</h2>
     <div class="recent" id="samples"></div>
     <p class="muted">押すだけで解析して、振付の画面になります。</p>
+    <button class="btn btn-ghost" id="btn-sync-test" type="button">音と動きのずれを確かめる</button>
   </div>
   <div style="display:flex;flex-direction:column;gap:10px" id="recent-wrap" hidden>
     <h2>最近解析した曲</h2>
@@ -272,7 +273,7 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
     </div>
     <div class="ctl">
       <div class="ctl-h"><label for="lead">モーターを音より先に動かす</label><span class="v" id="lead-v">150 ms</span></div>
-      <input id="lead" type="range" min="-200" max="800" step="10" value="150">
+      <input id="lead" type="range" min="-800" max="800" step="10" value="150">
       <div class="ends"><span>動きが早いとき</span><span>動きが遅れるとき</span></div>
       <p class="muted" style="font-size:12px;margin:0">再生中に動かすと、指を離した時にすぐ反映されます。値は音を出す先ごとに覚えます。</p>
     </div>
