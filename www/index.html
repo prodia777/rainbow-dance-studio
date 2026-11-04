@@ -176,6 +176,8 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 .seg button:disabled{opacity:.45;cursor:default}
 .bd-log{font-family:var(--f-mono);font-size:11px;line-height:1.6;color:var(--soft);max-height:150px;overflow-y:auto;overflow-wrap:anywhere}
 .bd-err{color:#FF8A80}
+.clock-row{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 6px}
+.clock-total{font-family:var(--f-mono);font-size:15px;color:var(--muted);white-space:nowrap}
 </style>
 
 </head>
@@ -279,7 +281,7 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
   <div class="stage-card">
     <canvas class="stick" id="stick" width="264" height="368" role="img" aria-label="仮想Rainbow Stick：動きデータどおりに回転します"></canvas>
     <div class="now">
-      <div class="clock" id="clock">0:00.0</div>
+      <div class="clock-row"><span class="clock" id="clock">0:00.0</span><span class="clock-total" id="clock-total"></span></div>
       <div class="chips"><span class="chip" id="chip-dir">待機中</span><span class="chip" id="chip-spd" hidden></span></div>
       <div style="display:flex;align-items:center;gap:12px">
         <button class="playbtn phys" id="btn-play" type="button" aria-pressed="false" aria-label="再生（基板へスタート信号）">

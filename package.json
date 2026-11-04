@@ -1,6 +1,6 @@
 {
   "name": "rainbow-dance-studio",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Rainbow Dance Studio - Rainbow Stick 振付アプリ（Android）",
   "scripts": {
