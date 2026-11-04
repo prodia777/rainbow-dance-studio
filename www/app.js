@@ -341,7 +341,7 @@
     [[res.eights.length + '回', '8の字'], [res.revCount + '回', '逆回転'], [res.ncut + '回', '電気を切る'], [song.secs.toFixed(1) + '秒', '解析時間']].forEach(function (x) {
       var d = document.createElement('div'); d.className = 'stat'; d.innerHTML = '<b>' + x[0] + '</b><span>' + x[1] + '</span>'; st.appendChild(d);
     });
-    $('clock').textContent = fmt(playOff); $('clock-total').textContent = '/ ' + fmtShort(song.buf.duration); updateChips(playOff);
+    $('clock').textContent = fmt(playOff); $('clock-total').textContent = fmtShort(song.buf.duration); updateChips(playOff);
   }
 
   // タイムライン
