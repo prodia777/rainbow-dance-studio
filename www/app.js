@@ -389,6 +389,9 @@
   $('mt-plus').addEventListener('click', function () { MT.bpm = Math.min(200, MT.bpm + 1); mtChange(); });
   $('mt-slider').addEventListener('input', function (e) { MT.bpm = +e.target.value; mtSave(); mtShow(); });
   $('mt-slider').addEventListener('change', function () { mtChange(true); });
+  $('mt-help').addEventListener('click', function () {
+    var box = $('mt-helpbox'), open = box.hidden; box.hidden = !open; this.setAttribute('aria-expanded', String(open));
+  });
   var taps = [];
   $('mt-tap').addEventListener('click', function () {
     var t = performance.now(); if (taps.length && t - taps[taps.length - 1] > 2000) taps = [];

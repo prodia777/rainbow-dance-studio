@@ -177,6 +177,10 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 .pc-col{display:flex;flex-direction:column;gap:18px;min-width:0}
 .mt-step{width:44px;height:44px;border-radius:22px;border:1px solid var(--line);background:transparent;color:var(--fg);font-size:22px;cursor:pointer;flex:none}
 .mt-tap{width:60px;height:44px;border-radius:12px;cursor:pointer;font-weight:700;flex:none}
+.mt-help{width:26px;height:26px;border-radius:13px;border:1px solid var(--line);background:transparent;color:var(--soft);font-weight:700;font-size:14px;cursor:pointer;flex:none;padding:0;margin-left:-4px}
+.mt-help[aria-expanded="true"]{background:#34D399;color:#062016;border-color:#34D399}
+.mt-helpbox{background:#0d0e11;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.6}
+.mt-helpbox ol{margin:6px 0;padding-left:20px}
 .mt-row{display:flex;align-items:center;gap:10px;font-size:13px}
 .mt-row>span{width:84px;flex:none;color:var(--soft)}
 .mt-row .seg{flex:1;display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
@@ -299,6 +303,17 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
       </div>
       <button class="mt-step" id="mt-plus" type="button" aria-label="テンポを上げる">＋</button>
       <button class="mt-tap phys" id="mt-tap" type="button">TAP</button>
+      <button class="mt-help" id="mt-help" type="button" aria-label="TAPボタンの使い方" aria-expanded="false">?</button>
+    </div>
+    <div class="mt-helpbox" id="mt-helpbox" hidden>
+      <b>TAP：たたいてテンポを決めるボタン</b>
+      <ol>
+        <li>合わせたい曲を聞きながら、その拍に合わせて「TAP」を一定の間隔で押します。</li>
+        <li>3回押すと、押した間隔からテンポ（○○拍/分）を計算して、数字が自動で変わります。</li>
+        <li>押し続けると、最後の数回の平均でテンポを合わせ直します。</li>
+        <li>2秒以上あけてから押すと、最初から数え直します。</li>
+      </ol>
+      <span class="muted">テンポの数字が分からない曲でも、聞きながらたたくだけで、その曲に合ったメトロノームを作れます。</span>
     </div>
     <input id="mt-slider" type="range" min="40" max="200" step="1" value="80" aria-label="テンポ">
     <div class="mt-row"><span>拍子</span><div class="seg" id="mt-beats" role="group" aria-label="拍子"><button type="button" data-v="1">なし</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="6">6</button></div></div>
