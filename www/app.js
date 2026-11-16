@@ -713,7 +713,7 @@
     $('lbl-play').textContent = on ? 'PAUSE' : 'PLAY';
     $('btn-play').setAttribute('aria-pressed', on ? 'true' : 'false');
     $('ico-play').toggleAttribute('hidden', on); $('ico-pause').toggleAttribute('hidden', !on); $('btn-play').setAttribute('aria-label', on ? '一時停止' : '再生');
-    $('mt-start-lbl').textContent = on ? 'ストップ' : 'スタート'; $('mt-ico-play').toggleAttribute('hidden', on); $('mt-ico-stop').toggleAttribute('hidden', !on); }
+    $('mt-start-lbl').textContent = on ? 'STOP' : 'PLAY'; $('mt-start').setAttribute('aria-pressed', on ? 'true' : 'false'); $('mt-start').setAttribute('aria-label', on ? 'メトロノームを止める' : 'メトロノームをスタート'); $('mt-ico-play').toggleAttribute('hidden', on); $('mt-ico-stop').toggleAttribute('hidden', !on); }
   $('btn-play').addEventListener('click', function () { if (play.on) stopPlay(false); else startPlay(); });
   // PC：MP3を画面に引っぱって入れても選べる
   if (IS_PC) {
