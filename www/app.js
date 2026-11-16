@@ -42,7 +42,7 @@
       mp3: ['使える曲', [dev + 'に保存したMP3などの音楽ファイルを選びます。' + (IS_PC ? 'ファイルを画面に引っぱって入れても選べます。' : ''),
         'Apple Music や Spotify などでダウンロードした曲は暗号化されているため使えません。',
         '曲は' + dev + 'の中だけで解析し、外部へは送りません。']],
-      metroBtn: ['メトロノーム', ['Rainbow Stickの球体の上下でリズムを刻むメトロノームです。', '球体が一番下まで落ちきった瞬間が「拍」です。']],
+      metroBtn: ['メトロノーム', ['Rainbow Stickの球体の上下でリズムを刻むメトロノームです。', '球体が一番下まで落ちきった瞬間が「拍」です。', 'PLAYを押すと、まず1小節ぶん（最大4拍）低い音でカウントしてから始まります。']],
       sync: ['音と動きのずれを確かめる', ['1秒ごとのクリック音に合わせて、振付と同じ動き（拍の直前に電気を切る）を60秒間します。',
         '基板につないで再生し、クリック音と実物の動きが合うように「モーターを音より先に動かす」の値を合わせます。', '一度合わせれば、値は覚えています。']],
       mode: ['1拍に1回上下／2拍に1回上下', ['テンポが遅い時は、1拍ごとに球体を上げて落とします。',
@@ -415,6 +415,9 @@
   function openMetro() {
     stopPlay(true);
     var pl = mtPlan(), T = pl.T, P = pl.P, sr = 16000, ac = getCtx();
+    // 始まる前のカウント：1小節ぶん（最大4拍）のクリック音を鳴らしてから、1拍目に球体が落ちきる
+    var cnt = Math.min(MT.beats > 1 ? MT.beats : 4, 4);
+    MT_PRE = Math.max(1.2, cnt * T + 0.3);
     var nBeats = Math.floor((MT_DUR - MT_PRE) / T), DUR = MT_PRE + nBeats * T + 0.3;
     var buf = ac.createBuffer(1, Math.ceil(DUR * sr), sr), d = buf.getChannelData(0), i, n;
     var beats = [];
@@ -423,6 +426,11 @@
       if (!MT.click) continue;
       var i0 = Math.round(tb * sr), L = Math.round(0.035 * sr), f = acc ? 1760 : 1320, g = acc ? 0.9 : 0.55;
       for (i = 0; i < L && i0 + i < d.length; i++) d[i0 + i] = g * Math.sin(2 * Math.PI * f * i / sr) * (1 - i / L);
+    }
+    if (MT.click) for (var c = 1; c <= cnt; c++) {   // カウントの音（拍の音より低く、短い木の音のような音）
+      var ci0 = Math.round((MT_PRE - c * T) * sr), CL = Math.round(0.03 * sr);
+      if (ci0 < 0) continue;
+      for (i = 0; i < CL && ci0 + i < d.length; i++) d[ci0 + i] = 0.5 * Math.sin(2 * Math.PI * 880 * i / sr) * (1 - i / CL);
     }
     var N = Math.ceil(DUR * FPS), cmd = new Int8Array(N), strokes = 0;
     function fill(a, b, pc) { var v = Math.trunc(A.CAP * pc / 100); for (var k = Math.max(0, Math.round(a * FPS)); k < Math.min(N, Math.round(b * FPS)); k++) cmd[k] = v; }
