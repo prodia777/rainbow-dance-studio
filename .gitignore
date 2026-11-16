@@ -5,3 +5,4 @@ android/app/build/
 android/keystore.properties
 *.jks
 .DS_Store
+build/

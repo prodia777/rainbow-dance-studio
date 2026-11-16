@@ -2,6 +2,14 @@
   'use strict';
   var A = window.RSChoreo, Board = window.RSBoard, $ = function (id) { return document.getElementById(id); };
   var FPS = 50;
+  // PCのブラウザ（Chrome / Edge）で開いた時：スマホのアプリではない
+  var IS_PC = !Board.native();
+  var NO_BOARD_MSG = IS_PC ? 'このブラウザでは基板につなげません。Chrome または Edge で開いてください' : 'この画面では基板につなげません';
+  if (IS_PC) {
+    document.documentElement.classList.add('pc');
+    var nl = document.getElementById('note-local'); if (nl) nl.textContent = '曲はこのPCの中だけで解析します。外部へは送信しません。';
+    var ob = document.querySelector('[data-out="phone"]'); if (ob) ob.textContent = 'PCのスピーカー';
+  }
 
   function store(key, val) { try { if (val === undefined) { var s = localStorage.getItem(key); return s ? JSON.parse(s) : null; } localStorage.setItem(key, JSON.stringify(val)); } catch (e) { return null; } }
   function toast(msg) { var t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(function () { t.hidden = true; }, 2600); }
@@ -399,7 +407,14 @@
     $('boardbar').dataset.st = st;
     if (msg) $('bd-txt').textContent = msg;
     else $('bd-txt').textContent = st === 'on' ? '基板につながっています' : (st === 'busy' ? 'つないでいます…' : '基板につながっていません');
-    var b = $('bd-btn'); b.disabled = st === 'busy'; b.textContent = st === 'on' ? '接続を切る' : '基板につなぐ';
+    var b = $('bd-btn'), u = $('bd-usb');
+    b.disabled = u.disabled = st === 'busy';
+    if (IS_PC) {
+      // PCのブラウザ：USBとBluetoothの2つのボタン
+      u.hidden = st === 'on' || !Board.canUsb();
+      b.hidden = st !== 'on' && !Board.canBle();
+      b.textContent = st === 'on' ? '接続を切る' : 'Bluetoothでつなぐ';
+    } else b.textContent = st === 'on' ? '接続を切る' : '基板につなぐ';
     $('t-right').disabled = $('t-left').disabled = st !== 'on';
   }
   Board.onState = function (st, msg) {
@@ -413,17 +428,30 @@
     else if (x === 'NG') bdLog('基板：データを受け取れませんでした', true);
   };
   Board.onLost = function () {
-    if (play.on) { bdLog('再生中にBluetoothが切れました。音楽も止めます', true); stopPlay(false); }
-    setTimeout(function () { if (Board.state === 'off') Board.connect(false); }, 1500);   // 基板が再起動した時など、1回だけつなぎ直す
+    if (play.on) { bdLog('再生中に' + Board.linkName() + 'が切れました。音楽も止めます', true); stopPlay(false); }
+    setTimeout(function () { if (Board.state === 'off') Board.connect(false, Board.mode, true); }, 1500);   // 基板が再起動した時など、1回だけつなぎ直す
   };
   $('bd-btn').addEventListener('click', function () {
     if (Board.state === 'on') { stopPlay(false); Board.disconnect(); return; }
-    if (!Board.available()) { $('bd-txt').textContent = 'この画面では基板につなげません（スマホのアプリで使えます）'; return; }
+    if (!Board.available()) { $('bd-txt').textContent = NO_BOARD_MSG; return; }
+    if (IS_PC) { Board.connect(bdFailed || !localStorageHasBoard() || Board.mode !== 'ble', 'ble'); return; }
     Board.connect(bdFailed || !localStorageHasBoard());
+  });
+  $('bd-usb').addEventListener('click', function () {
+    if (Board.state === 'on' || !Board.canUsb()) return;
+    Board.connect(bdFailed || Board.lastMode() !== 'usb', 'usb');
   });
   function localStorageHasBoard() { try { return !!localStorage.getItem('rs.board.id'); } catch (e) { return false; } }
   bdState('off');
-  if (Board.available() && localStorageHasBoard()) Board.connect(false);
+  if (!Board.available()) $('bd-txt').textContent = NO_BOARD_MSG;
+  else if (!IS_PC) { if (localStorageHasBoard()) Board.connect(false); }
+  else {
+    // PCのブラウザ：前回USBでつないでいたら、そのUSBへ自動でつなぐ（Bluetoothは、ブラウザが覚えている時だけ）
+    var lm = Board.lastMode();
+    if (lm === 'usb' || (lm === 'ble' && localStorageHasBoard())) {
+      Board.connect(false, lm, true).then(function (ok) { if (!ok) { bdFailed = false; bdState('off'); } });
+    }
+  }
 
   function ensureLoaded() {
     if (!res) return Promise.resolve();
@@ -520,6 +548,26 @@
     $('btn-play').setAttribute('aria-pressed', on ? 'true' : 'false');
     $('ico-play').toggleAttribute('hidden', on); $('ico-pause').toggleAttribute('hidden', !on); $('btn-play').setAttribute('aria-label', on ? '一時停止' : '再生'); }
   $('btn-play').addEventListener('click', function () { if (play.on) stopPlay(false); else startPlay(); });
+  // PC：MP3を画面に引っぱって入れても選べる
+  if (IS_PC) {
+    document.addEventListener('dragover', function (e) { if (e.dataTransfer && Array.prototype.indexOf.call(e.dataTransfer.types || [], 'Files') >= 0) e.preventDefault(); });
+    document.addEventListener('drop', function (e) {
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f) return;
+      e.preventDefault();
+      if (cur === 'analyze') return;
+      if (!/\.mp3$|^audio\//i.test(f.name + ' ' + f.type) && !/^audio\//.test(f.type)) { toast('MP3ファイルを入れてください'); return; }
+      try { var dt = new DataTransfer(); dt.items.add(f); var inp = $('file-mp3'); inp.files = dt.files; stopPlay(false); inp.dispatchEvent(new Event('change')); }
+      catch (err) { toast('このファイルは開けませんでした'); }
+    });
+    var nl2 = $('note-local'); if (nl2) nl2.textContent += '（MP3をこの画面に引っぱって入れても選べます）';
+  }
+  // PC：スペースキーで再生／一時停止
+  document.addEventListener('keydown', function (e) {
+    if (e.code !== 'Space' || cur !== 'result' || e.repeat) return;
+    var t = e.target && e.target.tagName; if (t === 'INPUT' || t === 'BUTTON' || t === 'SELECT' || t === 'TEXTAREA') return;
+    e.preventDefault(); $('btn-play').click();
+  });
   $('btn-rewind').addEventListener('click', function () { stopPlay(true); $('clock').textContent = fmt(0); var cd = $('chip-dir'); cd.textContent = '停止'; cd.style.background = '#2A2D33'; cd.style.color = 'var(--soft)'; $('chip-spd').hidden = true; toast('停止して曲の初めに戻りました'); });
 
   function sceneAt(pos) {
@@ -630,8 +678,17 @@
       } catch (e) { toast('保存できませんでした（' + (e && e.message ? e.message : 'エラー') + '）'); }
       return;
     }
-    var dl = null; try { dl = await window.claude.use('downloads'); } catch (e) { }
-    if (!dl) { toast('この画面では書き出しが使えません'); return; }
+    var dl = null; try { dl = window.claude && await window.claude.use('downloads'); } catch (e) { }
+    if (!dl) {
+      // PCのブラウザ：いつもの「ダウンロード」フォルダに保存
+      try {
+        var url = URL.createObjectURL(blob), a = document.createElement('a');
+        a.href = url; a.download = stem + '_motion.zip'; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+        toast('「ダウンロード」フォルダに保存しました');
+      } catch (e) { toast('この画面では書き出しが使えません'); }
+      return;
+    }
     try { await dl.save({ filename: stem + '_motion.zip', data: blob }); toast('書き出しました'); }
     catch (e) { if (e && e.code === 'declined') return; toast(e && e.code === 'rate_limited' ? '少し待ってからもう一度押してください' : '書き出せませんでした'); }
   });

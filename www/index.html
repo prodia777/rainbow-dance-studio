@@ -173,6 +173,8 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 .bd-txt{flex:1;min-width:0;font-size:13px;line-height:1.4;color:var(--soft)}
 .bd-btn{flex:none;min-height:40px;padding:0 12px;border:none;border-radius:10px;font:inherit;font-size:13px;font-weight:700;color:#121316;background:linear-gradient(180deg,#FFFFFF 0%,#E3E6EA 100%);box-shadow:inset 0 1px 0 #fff,0 2px 0 #6E737C;cursor:pointer}
 .bd-btn:disabled{opacity:.5}
+.bd-btn[hidden]{display:none}
+.boardbar{flex-wrap:wrap}
 .seg button:disabled{opacity:.45;cursor:default}
 .bd-log{font-family:var(--f-mono);font-size:11px;line-height:1.6;color:var(--soft);max-height:150px;overflow-y:auto;overflow-wrap:anywhere}
 .bd-err{color:#FF8A80}
@@ -188,6 +190,7 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 <div class="boardbar" id="boardbar">
   <span class="bd-dot" id="bd-dot" aria-hidden="true"></span>
   <span class="bd-txt" id="bd-txt" role="status">基板につながっていません</span>
+  <button class="bd-btn" id="bd-usb" type="button" hidden>USBでつなぐ</button>
   <button class="bd-btn" id="bd-btn" type="button">基板につなぐ</button>
 </div>
 
@@ -196,7 +199,7 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
   <div style="display:flex;flex-direction:column;gap:8px">
     <div class="eyebrow">RAINBOW STICK</div>
     <h1>Rainbow Dance Studio</h1>
-    <p class="muted" id="app-ver" style="margin:0">バージョン 0.3.5</p>
+    <p class="muted" id="app-ver" style="margin:0">バージョン 0.4.0</p>
     <p class="lead">曲を選ぶと、リズムと曲調に合わせて回る振付を自動で作り、Rainbow Stickを音楽に合わせて動かします。</p>
   </div>
   <div class="card" style="gap:16px">
@@ -208,7 +211,7 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
     <input id="file-mp3" class="file-input" type="file" accept=".mp3,audio/mpeg,audio/*">
     <div class="note">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-      <span>曲はこのスマホの中だけで解析します。外部へは送信しません。</span>
+      <span id="note-local">曲はこのスマホの中だけで解析します。外部へは送信しません。</span>
     </div>
     <p class="err" id="home-err" hidden></p>
   </div>
@@ -344,6 +347,7 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 
 <script>window.RS_SAMPLES=['jupiter'];</script>
 <script src="choreo.js"></script>
+<script src="weblink.js"></script>
 <script src="board.js"></script>
 <script src="app.js"></script>
 </body>

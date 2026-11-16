@@ -1,10 +1,11 @@
-Rainbow Dance Studio（Android版・iPhone版）　ビルドと配布の手順
+Rainbow Dance Studio（Android版・iPhone版・PC版）　ビルドと配布の手順
 =====================================================
-バージョン 0.3.5（試作版）／アプリID: com.prodia.rainbowdancestudio
+バージョン 0.4.0（試作版）／アプリID: com.prodia.rainbowdancestudio
 
 ■ このフォルダの中身
   www/        … アプリの画面と解析の処理（今のWebアプリと同じ。フォントも同梱し、ネットなしで動きます）
   android/    … Androidアプリのプロジェクト（Android Studioで開く）
+  tools/build-pc-web.mjs … PC版（Web版）をサーバーに置く形で作る（build/pc-web/ にできる）
   ios/        … iPhoneアプリのプロジェクト（MacのXcodeで ios/App/App.xcodeproj を開く）
   node_modules/ … アプリの部品（消さないでください）
   .github/workflows/build-apk.yml … GitHubで自動ビルドする場合の設定（Android）
@@ -25,6 +26,10 @@ Rainbow Dance Studio（Android版・iPhone版）　ビルドと配布の手順
   値は基板のPWMの値そのもの。100%＝166、8の字の35%＝58が最大
 
 ■ 変更履歴
+  0.4.0  PC版（Web版：Chrome / Edge）を追加。PCではUSBケーブルとBluetoothの両方でつなげる、
+         前回のつなぎ方で自動接続、MP3を画面に引っぱって入れる、スペースキーで再生／一時停止、
+         書き出しはPCの「ダウンロード」フォルダへ。基板へ大きいまとまりで送れない時は小さくして送り直す。
+         スマホのアプリの動きは変わらない（表示の言葉だけ「Bluetoothが切れました」などを共通化）
   0.3.5  最初の画面（タイトルの下）にバージョンを表示
   0.3.4  仮想スティックの動きを実物に近く（広がりと、電気を切った時の落ち方）、絵を少し大きく
   0.3.3  曲の長さを再生時間の下に分母の形で表示
@@ -109,3 +114,32 @@ iPhone版（2026-11-16 追加。Android版 0.3.5 と同じ中身）
  ■ バージョンを変えるとき（iPhone版）
   ios/App/App.xcodeproj/project.pbxproj の MARKETING_VERSION（例 0.3.5）と CURRENT_PROJECT_VERSION（例 8）を
   Android版の versionName / versionCode とそろえる
+
+-----------------------------------------------------
+PC版（Web版）（2026-11-16 追加。バージョン 0.4.0）
+-----------------------------------------------------
+ ■ どんなものか
+  ・ホームページに置き、お客様は Chrome または Edge でページを開くだけで使う（ダウンロード・インストール不要）
+  ・サーバーのファイルを上書きすれば、お客様は次に開いた時から最新版を使える
+  ・中身は www と同じ（解析・振付・再生・仮想スティック・ずれの調整・基板の記録）
+  ・基板とのつなぎ方：「USBでつなぐ」（USBケーブル）／「Bluetoothでつなぐ」（PC内蔵のBluetooth）
+    初回はブラウザの一覧から基板を選ぶ（USBは COMポート、Bluetoothは RainbowStick）。2回目からは前回のつなぎ方で自動接続
+  ・使えないブラウザ：Firefox、Safari（基板につなげない。画面にその旨を表示）
+  ・https のページでのみ動く（http で開いたら自動で https へ移る）
+
+ ■ 作り方
+  node tools/build-pc-web.mjs              → build/pc-web/dance-pc-test（テスト用。検索除け付き）
+  node tools/build-pc-web.mjs --prod       → build/pc-web/dance-pc（本番用）
+  ※ www を直したら、必ずバージョンを上げてから作る（ファイル名の後ろにバージョンを付けて、古いファイルが使われないようにしているため）
+
+ ■ サーバーへの置き方
+  1. まずテスト用：フォルダ「dance-pc-test」の中身を丸ごと https://rainbowstick777.com/dance-pc-test/ に置く
+     （.htaccess も一緒に。ファイル名が「.」で始まるので、FTPソフトで隠しファイルを表示して確認）
+  2. PCの Chrome / Edge で開いて確認
+  3. 問題なければ、本番用「dance-pc」の中身を https://rainbowstick777.com/dance-pc/ に置く
+  4. 更新する時も同じ：テスト用で確認 → 本番用を上書き
+
+ ■ USBでつなぐ時の注意
+  ・Arduino IDE のシリアルモニタなど、ほかの画面が基板のCOMポートを使っていると、つなげない
+  ・USBでつないだ時に基板が再起動することがある（アプリは自動で待って聞き直す）
+  ・USBドライバ：基板のUSBチップ（CH340 など）のドライバがPCに入っていること（Arduino IDE で書き込めるPCなら入っている）

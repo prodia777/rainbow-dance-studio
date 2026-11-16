@@ -3,9 +3,11 @@
 (function (root) {
   'use strict';
   var SERVICE = '6f5a0001-52b7-4c7e-9a34-1d2e3c4b5a60', RX = '6f5a0002-52b7-4c7e-9a34-1d2e3c4b5a60', TX = '6f5a0003-52b7-4c7e-9a34-1d2e3c4b5a60';
-  var KEY_DEV = 'rs.board.id';
+  var KEY_DEV = 'rs.board.id', KEY_MODE = 'rs.board.mode';
 
-  function ble() { return root.Capacitor && root.Capacitor.Plugins && root.Capacitor.Plugins.BluetoothLe; }
+  // スマホのアプリ：Capacitor の Bluetooth 部品。PCのブラウザ：weblink.js（Bluetooth または USB）
+  function nativeBle() { return root.Capacitor && root.Capacitor.isNativePlatform && root.Capacitor.isNativePlatform() && root.Capacitor.Plugins && root.Capacitor.Plugins.BluetoothLe; }
+  function ble() { return nativeBle() || (B.mode === 'usb' ? root.RSWebSerial : root.RSWebBle); }
   function hex(u8) { var s = ''; for (var i = 0; i < u8.length; i++) s += (u8[i] < 16 ? '0' : '') + u8[i].toString(16); return s; }
   function unhex(s) { var o = ''; s = String(s || '').replace(/\s/g, ''); for (var i = 0; i + 1 < s.length; i += 2) o += String.fromCharCode(parseInt(s.substr(i, 2), 16)); return o; }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
@@ -14,7 +16,13 @@
 
   var B = {
     state: 'off',          // off 未接続 / busy つないでいる / on 接続中
-    available: function () { return !!ble(); },
+    mode: 'ble',           // ble Bluetooth / usb USBケーブル（PCのみ）
+    native: function () { return !!nativeBle(); },
+    canBle: function () { return !!(nativeBle() || root.RSWebBle); },
+    canUsb: function () { return !nativeBle() && !!root.RSWebSerial; },
+    available: function () { return this.canBle() || this.canUsb(); },
+    lastMode: function () { try { return localStorage.getItem(KEY_MODE) || ''; } catch (e) { return ''; } },
+    linkName: function () { return this.mode === 'usb' ? 'USB' : 'Bluetooth'; },
     deviceId: null, version: '', reason: '', loadedKey: null, clockOffset: null, rtt: null, mtu: 23,
     onState: function () { }, onLine: function () { }, onLog: function () { },
     _lines: [], _inited: false, _listeners: [],
@@ -25,25 +33,32 @@
     _init: async function () {
       if (this._inited) return;
       var P = ble();
-      if (!P) throw new Error('このアプリではBluetoothを使えません');
+      if (!P) throw new Error(this.mode === 'usb' ? 'このブラウザではUSBを使えません。Chrome または Edge で開いてください' : 'このブラウザではBluetoothを使えません。Chrome または Edge で開いてください');
       await P.initialize({ androidNeverForLocation: true });
-      this._inited = true;
+      if (nativeBle()) this._inited = true;
     },
 
     // 初めて：一覧から基板を選ぶ。2回目以降：覚えている基板へ
-    connect: async function (pick) {
+    // mode：PCのブラウザで 'usb' か 'ble' を選ぶ（スマホのアプリでは使わない）
+    // auto：画面を開いた時などの自動接続（PCのブラウザでは、選ぶ画面を出せないので、覚えている基板だけにつなぐ）
+    connect: async function (pick, mode, auto) {
       if (this.state === 'on' || this.state === 'busy') return;
-      this._set('busy', '基板を探しています…');
+      if (!nativeBle() && mode) this.mode = mode;
+      if (nativeBle()) this.mode = 'ble';
+      this._set('busy', this.mode === 'usb' ? 'USBの基板を探しています…' : '基板を探しています…');
       try {
         await this._init();
         var P = ble();
         var en = await P.isEnabled();
-        if (en && en.value === false) throw new Error('スマホのBluetoothがオフです。オンにしてください');
-        var id = pick ? null : getId();
+        if (en && en.value === false) throw new Error(nativeBle() ? 'スマホのBluetoothがオフです。オンにしてください' : 'このPCのBluetoothがオフか、ありません。オンにするか、USBケーブルでつないでください');
+        var id = pick ? null : (this.mode === 'usb' ? 'usb' : getId());
+        if (id && P.knows && !(await P.knows(id))) { if (auto) throw new Error('Device not found'); id = null; }
         if (!id) { var d = await P.requestDevice({ services: [SERVICE], optionalServices: [] }); id = d.deviceId; }
         await this._open(id);
-        setId(id);
-        this._set('on', this.version ? '基板につながりました（' + this.version + '）' : '基板につながりました');
+        if (this.mode !== 'usb') setId(id);
+        try { if (!nativeBle()) localStorage.setItem(KEY_MODE, this.mode); } catch (e) { }
+        var how = nativeBle() ? '' : (this.mode === 'usb' ? 'USBで' : 'Bluetoothで');
+        this._set('on', this.version ? how + '基板につながりました（' + this.version + '）' : how + '基板につながりました');
         return true;
       } catch (e) {
         this._closeListeners();
@@ -55,7 +70,9 @@
 
     _why: function (e) {
       var m = (e && e.message) || String(e);
-      if (/cancel/i.test(m)) return '基板を選ぶのをやめました';
+      if (/cancel|No port selected/i.test(m)) return '基板を選ぶのをやめました';
+      if (/^USB_OPEN/.test(m)) return 'USBのポートを開けません。Arduino IDE のシリアルモニタなど、ほかの画面が基板を使っていないか確かめてください';
+      if (/not found/i.test(m) && !nativeBle()) return this.mode === 'usb' ? 'USBの基板が見つかりません。ケーブルをつないで「USBでつなぐ」を押してください' : '基板が見つかりません。「Bluetoothでつなぐ」を押して選んでください';
       if (/timeout|timed out|not found|Connection/i.test(m)) return '基板が見つかりません。基板の電源と、近くにあるかを確かめてください';
       if (/permission/i.test(m)) return 'Bluetoothの許可が必要です。スマホの設定でこのアプリに許可してください';
       return m;
@@ -77,12 +94,15 @@
       this.clockOffset = null;
       this.version = ''; this.reason = '';
       this._lines = [];
-      await this._send([86]);   // V
-      try {
-        var line = await this.waitLine('READY', 2000);
-        var p = line.split(' ');
-        this.version = p[1] || ''; this.reason = p[2] || '';
-      } catch (e) { throw new Error('基板から返事がありません。基板プログラムが v0.9 か確かめてください'); }
+      // USBは、つないだ時に基板が再起動することがあるので、何回か聞き直す
+      var line = null, tries = this.mode === 'usb' && !nativeBle() ? 4 : 1;
+      for (var k = 0; k < tries && !line; k++) {
+        await this._send([86]);   // V
+        try { line = await this.waitLine('READY', k ? 1500 : 2000); } catch (e) { }
+      }
+      if (!line) throw new Error('基板から返事がありません。基板プログラムが v0.9 か確かめてください');
+      var p = line.split(' ');
+      this.version = p[1] || ''; this.reason = p[2] || '';
       this._log('接続 ' + this.version + '（前回の起動の原因：' + this.reasonText() + '）');
     },
 
@@ -105,8 +125,8 @@
       if (!this.deviceId) return;     // 自分で切った時
       this.deviceId = null; this.loadedKey = null; this.clockOffset = null;
       this._closeListeners();
-      this._log('Bluetoothが切れました');
-      this._set('off', 'Bluetoothが切れました');
+      this._log(this.linkName() + 'が切れました');
+      this._set('off', this.linkName() + 'が切れました');
       if (this.onLost) this.onLost();
     },
 
@@ -149,8 +169,8 @@
       if (key && key === this.loadedKey) return false;
       var n = cmd.length, u8 = new Uint8Array(cmd.buffer, cmd.byteOffset, n), sum = 0, i;
       for (i = 0; i < n; i++) sum += u8[i];
-      var size = Math.max(20, Math.min(this.mtu - 3, 244));
-      for (var attempt = 0; attempt < 2; attempt++) {
+      for (var attempt = 0; attempt < 3; attempt++) {
+        var size = this.mode === 'usb' && !nativeBle() ? 512 : Math.max(20, Math.min(this.mtu - 3, 244));
         this.loadedKey = null;
         this._lines = [];
         try {
@@ -164,7 +184,9 @@
           this._log('転送の確認が合いません（' + line + '）');
         } catch (e) {
           if (!this.deviceId) throw e;
+          if (this.mtu > 23 && this.mode !== 'usb') this.mtu = 23;   // 大きいまとまりで送れない時は、小さくして送り直す
           this._log('転送をやり直します：' + e.message);
+          await sleep(3200);   // 基板が途中のデータを捨てるのを待つ（基板は3秒で受け取りをやめる）
         }
       }
       throw new Error('振付を基板へ送れませんでした');
