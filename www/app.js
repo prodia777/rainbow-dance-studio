@@ -383,6 +383,8 @@
     mtTimer = setTimeout(function () { var was = play.on; openMetro(); if (was) startPlay(); }, now ? 0 : 350);
   }
   $('btn-metro').addEventListener('click', openMetro);
+  // メトロノームの「スタート／ストップ」（テンポの近く）。ストップすると次は最初の拍から
+  $('mt-start').addEventListener('click', function () { if (play.on) stopPlay(true); else startPlay(); });
   $('mt-minus').addEventListener('click', function () { MT.bpm = Math.max(40, MT.bpm - 1); mtChange(); });
   $('mt-plus').addEventListener('click', function () { MT.bpm = Math.min(200, MT.bpm + 1); mtChange(); });
   $('mt-slider').addEventListener('input', function (e) { MT.bpm = +e.target.value; mtSave(); mtShow(); });
@@ -662,8 +664,10 @@
       var autoLat = (ac.outputLatency || ac.baseLatency || 0) * 1000, heard = when * 1000 + map + autoLat, motor = heard - lead;
       play = { on: true, src: src, when: when, off: off, heard: heard, boardStart: motor, autoLat: autoLat, useBoard: useBoard };
       src.onended = function () {
-        if (play.src === src && play.on && audioPos() >= song.buf.duration - 0.3) { play.on = false; playOff = 0; paused = false; setPlayIcon(false); $('chip-dir').textContent = '終了'; }
-        if (res && res.metro && !play.on && playOff === 0) startPlay();
+        if (play.src === src && play.on && audioPos() >= song.buf.duration - 0.3) {
+          play.on = false; playOff = 0; paused = false; setPlayIcon(false); $('chip-dir').textContent = '終了';
+          if (res && res.metro) startPlay();   // メトロノームは最後まで行ったら最初から続ける
+        }
       };
       $('sy-sig').textContent = Math.round(wait * 1000) + ' ms後・' + fmt(off) + 'から';
       $('sy-lat').textContent = Math.round(autoLat) + ' ms';
@@ -708,7 +712,8 @@
   function setPlayIcon(on) {
     $('lbl-play').textContent = on ? 'PAUSE' : 'PLAY';
     $('btn-play').setAttribute('aria-pressed', on ? 'true' : 'false');
-    $('ico-play').toggleAttribute('hidden', on); $('ico-pause').toggleAttribute('hidden', !on); $('btn-play').setAttribute('aria-label', on ? '一時停止' : '再生'); }
+    $('ico-play').toggleAttribute('hidden', on); $('ico-pause').toggleAttribute('hidden', !on); $('btn-play').setAttribute('aria-label', on ? '一時停止' : '再生');
+    $('mt-start-lbl').textContent = on ? 'ストップ' : 'スタート'; $('mt-ico-play').toggleAttribute('hidden', on); $('mt-ico-stop').toggleAttribute('hidden', !on); }
   $('btn-play').addEventListener('click', function () { if (play.on) stopPlay(false); else startPlay(); });
   // PC：MP3を画面に引っぱって入れても選べる
   if (IS_PC) {
