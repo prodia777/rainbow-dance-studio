@@ -180,9 +180,10 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 .mt-help{width:26px;height:26px;border-radius:13px;border:1px solid var(--line);background:transparent;color:var(--soft);font-weight:700;font-size:14px;cursor:pointer;flex:none;padding:0;margin-left:-4px}
 .mt-help[aria-expanded="true"]{background:#34D399;color:#062016;border-color:#34D399}
 .mt-helpbox{background:#0d0e11;border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.6}
-.mt-helpbox ol{margin:6px 0;padding-left:20px}
+.mt-helpbox ol,.mt-helpbox ul{margin:6px 0;padding-left:20px}
+.mt-helpbox{text-align:left;font-weight:400;color:var(--fg)}
 .mt-row{display:flex;align-items:center;gap:10px;font-size:13px}
-.mt-row>span{width:84px;flex:none;color:var(--soft)}
+.mt-row>span{width:108px;flex:none;color:var(--soft);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .mt-row .seg{flex:1;display:grid;grid-auto-flow:column;grid-auto-columns:1fr}
 .mt-lamp{width:22px;height:22px;border-radius:11px;background:#2A2D33;flex:none;transition:background .05s}
 .mt-lamp.on{background:#34D399;box-shadow:0 0 14px #34D399}

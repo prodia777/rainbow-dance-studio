@@ -29,6 +29,83 @@
       cols.appendChild(L); cols.appendChild(R); sec.appendChild(cols);
     })();
   }
+  // ================= 「?」マーク：初めて使う人向けの説明 =================
+  (function () {
+    var dev = IS_PC ? 'PC' : 'スマホ';
+    var H = {
+      board: ['基板とのつなぎ方', IS_PC
+        ? ['「USBでつなぐ」：基板とPCをUSBケーブルでつなぎ、表示された一覧から基板（COMポート）を選びます。いちばん安定します。',
+           '「Bluetoothでつなぐ」：一覧から「RainbowStick」を選びます。',
+           '2回目からは、前回と同じつなぎ方で自動的につながります。',
+           'Arduino IDE のシリアルモニタなど、ほかの画面が基板を使っていると、つなげません。']
+        : ['「基板につなぐ」を押して、一覧から「RainbowStick」を選びます。', '2回目からは自動でつながります。', 'スマホのBluetoothをオンにしておいてください。']],
+      mp3: ['使える曲', [dev + 'に保存したMP3などの音楽ファイルを選びます。' + (IS_PC ? 'ファイルを画面に引っぱって入れても選べます。' : ''),
+        'Apple Music や Spotify などでダウンロードした曲は暗号化されているため使えません。',
+        '曲は' + dev + 'の中だけで解析し、外部へは送りません。']],
+      metroBtn: ['メトロノーム', ['Rainbow Stickの球体の上下でリズムを刻むメトロノームです。', '球体が一番下まで落ちきった瞬間が「拍」です。']],
+      sync: ['音と動きのずれを確かめる', ['1秒ごとのクリック音に合わせて、振付と同じ動き（拍の直前に電気を切る）を60秒間します。',
+        '基板につないで再生し、クリック音と実物の動きが合うように「モーターを音より先に動かす」の値を合わせます。', '一度合わせれば、値は覚えています。']],
+      mode: ['1拍に1回上下／2拍に1回上下', ['テンポが遅い時は、1拍ごとに球体を上げて落とします。',
+        'テンポが速いと、1拍の間では球体が十分に上がらないため、自動で「2拍に1回」の上下に切り替えます。',
+        'どのテンポで切り替わるかは、「上下の大きさ」と「画面のスティックを実物に合わせる」の値で変わります。']],
+      beats: ['拍子', ['1小節の拍の数です（4拍子なら「1・2・3・4」）。', '1拍目だけ球体を少し高く上げ、クリック音も高い音にして、小節の頭が分かるようにします。', '「なし」はすべての拍が同じです。']],
+      power: ['上下の大きさ', ['球体をどのくらい高く上げるかです。小・中・大の順に、モーターの力を強くします。',
+        '大きいほどよく見えますが、モーターの負担も増えます。ふだんは「中」がおすすめです。']],
+      trace: ['高さの線と拍のずれ', ['緑の線は球体の高さ（上が高い）、縦線は拍（黄色は1拍目）です。線の谷が縦線に重なっていれば、落ちきる瞬間が拍に合っています。',
+        '左の丸いランプは、拍の瞬間に光ります。', '「拍のずれ」は画面のスティックで計った値です（＋は遅れ、−は早い）。']],
+      fit: ['画面のスティックを実物に合わせる', ['実物のRainbow Stickを動画で撮り、画面のスティックと上がる速さ・落ちる速さが同じになるように2つの値を合わせます。',
+        '値を変えると、落ちきる瞬間が拍に来るように、電気を切る時刻をアプリが自動で計算し直します。',
+        '音と動き全体のずれ（いつも少し早い・遅い）は、「モーターを音より先に動かす」で合わせます。']],
+      out: ['音を出す先', [dev + 'のスピーカー：' + dev + '本体のスピーカー（またはケーブルでつないだスピーカー）から音を出します。',
+        'Bluetoothスピーカー：音が少し遅れて出るので、その分モーターを早めに動かします。', 'ずれの値は、音を出す先ごとに別々に覚えます。']],
+      lead: ['モーターを音より先に動かす', ['実物のモーターは、電気を入れてから回り始めるまで少し時間がかかります。その分だけ先に動かして、音と動きを合わせます。',
+        '動きが音より早いと感じたら左へ、遅いと感じたら右へ動かします。', '「音と動きのずれを確かめる」で合わせると簡単です。']],
+      test: ['基板を試す', ['音を出さずに、モーターを右回り・左回りに2秒だけ回します。', '基板とモーターが正しくつながっているかの確認に使います。']],
+      tl: ['振付のタイムライン', ['曲の始めから終わりまでの振付です。上の段は電気の強さ、下の段は回る向き（オレンジ＝右、青＝左）です。',
+        '線や印は、曲調の変わり目（逆回転）・8の字・ゆっくり逆回転の場面を表します。', 'タイムラインを押すと、その位置から再生します。']],
+      syncTbl: ['数字の見方', ['基板と音の時刻を合わせた結果です。「モーターの先行」が「モーターを音より先に動かす」の値に近ければ、正しく動いています。',
+        'うまく動かない時の確認用なので、ふだんは見なくて大丈夫です。']],
+      log: ['基板の記録', ['基板とのやりとり（つないだ・振付を送った・ずれを変えた など）の記録です。', '「前回の起動の原因」に「電圧不足」などが出たら、USB電源を見直してください。']],
+      exp: ['データを書き出す', ['振付のデータ（基板へ送るデータと表）を、ひとつのファイルにまとめて保存します。' + (IS_PC ? 'PCの「ダウンロード」フォルダに保存されます。' : ''),
+        '記録や、ほかの機器で使うためのものです。ふだんの再生には必要ありません。']]
+    };
+    function qBtn(key) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'mt-help'; b.textContent = '?';
+      b.setAttribute('aria-label', H[key][0] + 'の説明'); b.setAttribute('aria-expanded', 'false'); b.dataset.help = key; return b;
+    }
+    function box(key) {
+      var d = document.createElement('div'); d.className = 'mt-helpbox'; d.hidden = true;
+      var t = document.createElement('b'); t.textContent = H[key][0]; d.appendChild(t);
+      var ul = document.createElement('ul'); H[key][1].forEach(function (x) { var li = document.createElement('li'); li.textContent = x; ul.appendChild(li); }); d.appendChild(ul);
+      return d;
+    }
+    // into：「?」を置く場所、after：説明を出す場所（この後ろ）
+    function add(key, into, after, before) {
+      if (!into || !after) return;
+      var b = qBtn(key), d = box(key);
+      if (before) into.insertBefore(b, before); else into.appendChild(b);
+      after.parentNode.insertBefore(d, after.nextSibling);
+      b.addEventListener('click', function (e) { e.preventDefault(); e.stopPropagation(); var open = d.hidden; d.hidden = !open; b.setAttribute('aria-expanded', String(open)); });
+    }
+    function wrapRow(el) { var r = document.createElement('div'); r.style.cssText = 'display:flex;align-items:center;gap:8px'; el.parentNode.insertBefore(r, el); r.appendChild(el); el.style.flex = '1'; return r; }
+    function byText(sel, txt) { return Array.prototype.find.call(document.querySelectorAll(sel), function (e) { return e.textContent.trim().indexOf(txt) === 0; }); }
+    var bb = $('boardbar'); add('board', bb, bb);
+    var note = document.querySelector('#scr-home .note'); if (note) add('mp3', note, note);
+    var mb = $('btn-metro'); var r1 = wrapRow(mb); add('metroBtn', r1, r1);
+    var sb = $('btn-sync-test'); var r2 = wrapRow(sb); add('sync', r2, r2);
+    var mm = $('mt-mode'); if (mm) { var mw = document.createElement('div'); mw.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:4px'; mm.parentNode.insertBefore(mw, mm); mw.appendChild(mm); add('mode', mw, $('mt-slider')); }
+    [['beats', 'mt-beats'], ['power', 'mt-power']].forEach(function (x) { var row = $(x[1]).parentNode; add(x[0], row.firstElementChild, row); });
+    var er = $('mt-err'); var r3 = wrapRow(er); er.style.flex = ''; add('trace', r3, r3);
+    var sm = document.querySelector('.mt-adv summary'); if (sm) add('fit', sm, sm);
+    var outL = byText('#scr-result span', '音を出す先'); if (outL) { var or = wrapRow(outL); outL.style.flex = ''; add('out', or, or); }
+    var ld = document.querySelector('label[for="lead"]'); if (ld) add('lead', ld.parentNode, ld.parentNode, ld.nextSibling);
+    var ts = byText('#scr-result span.muted', '基板を試す'); if (ts) { var tr = wrapRow(ts); ts.style.flex = ''; add('test', tr, tr); }
+    var tl = byText('#scr-result span', '振付のタイムライン'); if (tl) { var tlw = document.createElement('span'); tlw.style.cssText = 'display:inline-flex;align-items:center;gap:6px'; tl.parentNode.insertBefore(tlw, tl); tlw.appendChild(tl); add('tl', tlw, tl.closest('div')); }
+    var sy = $('sync'); if (sy) { var sr = document.createElement('div'); sr.style.cssText = 'display:flex;justify-content:flex-end;margin-bottom:-12px'; sy.parentNode.insertBefore(sr, sy); add('syncTbl', sr, sr); }
+    var lg = byText('#scr-result span', '基板の記録'); if (lg) { var lr = wrapRow(lg); lg.style.flex = ''; add('log', lr, lr); }
+    var ex = $('btn-export'); var r4 = wrapRow(ex); add('exp', r4, r4);
+  })();
+
 
   function store(key, val) { try { if (val === undefined) { var s = localStorage.getItem(key); return s ? JSON.parse(s) : null; } localStorage.setItem(key, JSON.stringify(val)); } catch (e) { return null; } }
   function toast(msg) { var t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(function () { t.hidden = true; }, 2600); }
