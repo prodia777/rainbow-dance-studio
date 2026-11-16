@@ -1,12 +1,14 @@
-Rainbow Dance Studio（Android版）　ビルドと配布の手順
+Rainbow Dance Studio（Android版・iPhone版）　ビルドと配布の手順
 =====================================================
 バージョン 0.3.5（試作版）／アプリID: com.prodia.rainbowdancestudio
 
 ■ このフォルダの中身
   www/        … アプリの画面と解析の処理（今のWebアプリと同じ。フォントも同梱し、ネットなしで動きます）
   android/    … Androidアプリのプロジェクト（Android Studioで開く）
+  ios/        … iPhoneアプリのプロジェクト（MacのXcodeで ios/App/App.xcodeproj を開く）
   node_modules/ … アプリの部品（消さないでください）
-  .github/workflows/build-apk.yml … GitHubで自動ビルドする場合の設定
+  .github/workflows/build-apk.yml … GitHubで自動ビルドする場合の設定（Android）
+  .github/workflows/build-ios.yml … GitHubのMacでiPhone版のビルド確認（署名なし）
   server/dance/ … 自社サーバーに置くダウンロードページ（index.html、icon.png、.htaccess）
 
 ■ アプリでできること
@@ -79,3 +81,31 @@ Rainbow Dance Studio（Android版）　ビルドと配布の手順
 
 ■ iPhone版について
   iPhoneはアプリストア以外からのインストールに大きな制限があるため、別途検討します。
+
+-----------------------------------------------------
+iPhone版（2026-11-16 追加。Android版 0.3.5 と同じ中身）
+-----------------------------------------------------
+ ■ 今の状態
+  ・ios/ フォルダにiPhoneアプリのプロジェクトを作成済み（Capacitor 8.5.3、iOS 15以上、iPhone専用）
+  ・アプリの画面と解析（www/）はAndroid版と共通。www を直したら「npx cap sync ios」でiPhone版にも反映
+  ・GitHubのMacで、署名なしのビルドが通ることを確認（Actions の「Build iOS (check)」）
+  ・まだ実機では動かしていない（Mac・iPhone・Apple Developer Program が無いため）
+
+ ■ iPhone版で違うところ
+  ・曲の選び方：「ファイル」アプリ（このiPhone内・iCloud Drive・Googleドライブなど）に保存したMP3から選ぶ
+    （「ミュージック」アプリのライブラリから選ぶ機能は、必要になったら追加。iPhone用の部品が別に必要）
+  ・書き出し：「ファイル」アプリ → このiPhone内 → Rainbow Dance Studio → RainbowDanceStudio
+  ・マナーモード（消音スイッチ）でも曲の音が出るように設定済み
+  ・Androidの「戻る」ボタンに当たるものは無い（画面のボタンで戻る）
+  ・Bluetooth：基板（BLE、名前 RainbowStick）にそのままつながる仕組み。初回に許可の確認が出る
+
+ ■ 配布について
+  ・日本ではiPhoneアプリを自社サーバーから直接インストールすることはできない
+    → App Store で公開（テストは TestFlight）
+  ・必要なもの：Apple Developer Program（年間99米ドル相当）。会社名で出すなら組織で登録（D-U-N-S番号）
+  ・Macが無くても、GitHubのMacで署名してTestFlight／App Storeへ送る設定は作れる
+    （登録後に、署名用の証明書などを GitHub の Secrets に登録する必要あり）
+
+ ■ バージョンを変えるとき（iPhone版）
+  ios/App/App.xcodeproj/project.pbxproj の MARKETING_VERSION（例 0.3.5）と CURRENT_PROJECT_VERSION（例 8）を
+  Android版の versionName / versionCode とそろえる

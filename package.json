@@ -2,16 +2,18 @@
   "name": "rainbow-dance-studio",
   "version": "0.3.5",
   "private": true,
-  "description": "Rainbow Dance Studio - Rainbow Stick 振付アプリ（Android）",
+  "description": "Rainbow Dance Studio - Rainbow Stick 振付アプリ（Android / iPhone）",
   "scripts": {
-    "sync": "cap sync android"
+    "sync": "cap sync android",
+    "sync:ios": "cap sync ios"
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "8.3.0",
     "@capacitor/android": "8.5.3",
     "@capacitor/app": "8.1.2",
     "@capacitor/core": "8.5.3",
-    "@capacitor/filesystem": "8.1.4"
+    "@capacitor/filesystem": "8.1.4",
+    "@capacitor/ios": "8.5.3"
   },
   "devDependencies": {
     "@capacitor/cli": "8.5.3"

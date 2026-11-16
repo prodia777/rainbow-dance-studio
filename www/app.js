@@ -418,7 +418,7 @@
   };
   $('bd-btn').addEventListener('click', function () {
     if (Board.state === 'on') { stopPlay(false); Board.disconnect(); return; }
-    if (!Board.available()) { $('bd-txt').textContent = 'この画面では基板につなげません（Androidアプリで使えます）'; return; }
+    if (!Board.available()) { $('bd-txt').textContent = 'この画面では基板につなげません（スマホのアプリで使えます）'; return; }
     Board.connect(bdFailed || !localStorageHasBoard());
   });
   function localStorageHasBoard() { try { return !!localStorage.getItem('rs.board.id'); } catch (e) { return false; } }
@@ -620,13 +620,13 @@
     for (var i = 0; i < res.cmd.length; i++) { var v = res.cmd[i]; lines.push((i / FPS).toFixed(2) + ',' + (v > 0 ? '右' : (v < 0 ? '左' : '電気オフ(惰性)')) + ',' + (Math.abs(v) / A.CAP * 100).toFixed(1) + ',' + v); }
     var csv = new Uint8Array([0xEF, 0xBB, 0xBF].concat(Array.from(new TextEncoder().encode(lines.join('\r\n')))));
     var blob = zip([{ name: stem + '_motion.bin', data: A.toBin(res.cmd, song.name) }, { name: stem + '_motion.csv', data: csv }]);
-    // Androidアプリ：スマホの「Documents/RainbowDanceStudio」フォルダに保存
+    // アプリ：Androidは「Documents/RainbowDanceStudio」、iPhoneは「ファイル」アプリのこのアプリのフォルダに保存
     var cap = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Filesystem;
     if (cap) {
       try {
         var b64 = await new Promise(function (ok, ng) { var fr = new FileReader(); fr.onload = function () { ok(String(fr.result).split(',')[1]); }; fr.onerror = ng; fr.readAsDataURL(blob); });
         await cap.writeFile({ path: 'RainbowDanceStudio/' + stem + '_motion.zip', data: b64, directory: 'DOCUMENTS', recursive: true });
-        toast('Documents/RainbowDanceStudio に保存しました');
+        toast(window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios' ? '「ファイル」アプリ → このiPhone内 → Rainbow Dance Studio → RainbowDanceStudio に保存しました' : 'Documents/RainbowDanceStudio に保存しました');
       } catch (e) { toast('保存できませんでした（' + (e && e.message ? e.message : 'エラー') + '）'); }
       return;
     }

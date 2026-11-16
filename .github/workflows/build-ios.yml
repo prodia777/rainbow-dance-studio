@@ -1,0 +1,44 @@
+# iPhone版のビルド確認（GitHubのMacで自動ビルド）
+# Apple Developer Program に登録するまでは「署名なし」で作り、ビルドが通るかだけを確認します。
+# できたもの：シミュレーター用アプリ（Macのシミュレーターで動かせる）を Actions の画面に保存。
+name: Build iOS (check)
+on:
+  push:
+    branches: [ main ]
+    paths-ignore: [ 'apk/**', 'android/**', '.github/workflows/build-apk.yml' ]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci
+      - run: npx cap sync ios
+      - name: Xcodeの版
+        run: xcodebuild -version
+      - name: シミュレーター用にビルド（署名なし）
+        run: |
+          cd ios/App
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -40
+          test -d build/Build/Products/Release-iphonesimulator/App.app
+      - name: iPhone実機用にビルド（署名なし・確認のみ）
+        run: |
+          cd ios/App
+          xcodebuild -project App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build | tail -40
+          test -d build/Build/Products/Release-iphoneos/App.app
+      - name: まとめる
+        run: |
+          cd ios/App/build/Build/Products
+          ditto -c -k --keepParent Release-iphonesimulator/App.app $GITHUB_WORKSPACE/RainbowDanceStudio_iOS_simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RainbowDanceStudio-ios-simulator
+          path: RainbowDanceStudio_iOS_simulator.zip
