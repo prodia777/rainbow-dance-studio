@@ -165,6 +165,16 @@ input[type=range]{width:100%;accent-color:var(--amber);height:28px;margin:0}
 .lv i:nth-child(1){height:5px}.lv i:nth-child(2){height:8px}.lv i:nth-child(3){height:12px}.lv i:nth-child(4){height:16px}
 .lv[data-n="1"] i:nth-child(-n+1),.lv[data-n="2"] i:nth-child(-n+2),.lv[data-n="3"] i:nth-child(-n+3),.lv[data-n="4"] i:nth-child(-n+4){background:currentColor!important}
 @media (prefers-reduced-motion: reduce){.bar>i{transition:none}}
+/* PCのブラウザ：横長の画面では振付の画面を左右2列にする */
+@media (min-width: 1000px){
+  html.pc .app{max-width:1080px}
+  html.pc #scr-home, html.pc #scr-analyze{width:100%;max-width:480px;margin:0 auto}
+  html.pc .pc-cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:24px;align-items:start}
+  html.pc .stage-card{grid-template-columns:210px minmax(0,1fr)}
+  html.pc .stick{width:210px;height:293px}
+  html.pc .tl{height:160px}
+}
+.pc-col{display:flex;flex-direction:column;gap:18px;min-width:0}
 
 .boardbar{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-bottom:16px}
 .bd-dot{width:10px;height:10px;border-radius:5px;background:#5A5F68;flex:none}

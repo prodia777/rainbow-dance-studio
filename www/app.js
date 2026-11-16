@@ -4,11 +4,30 @@
   var FPS = 50;
   // PCのブラウザ（Chrome / Edge）で開いた時：スマホのアプリではない
   var IS_PC = !Board.native();
-  var NO_BOARD_MSG = IS_PC ? 'このブラウザでは基板につなげません。Chrome または Edge で開いてください' : 'この画面では基板につなげません';
+  var UA = navigator.userAgent || '';
+  var IS_IOS = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1);
+  var IS_MAC_SAFARI = !IS_IOS && /Macintosh/.test(UA) && /Safari/.test(UA) && !/Chrome|Chromium|Edg\//.test(UA);
+  var NO_BOARD_MSG = !IS_PC ? 'この画面では基板につなげません'
+    : IS_IOS ? 'iPhone・iPadのブラウザでは基板につなげません。PC（Windows・Mac）の Chrome または Edge で開いてください'
+    : IS_MAC_SAFARI ? 'MacのSafariでは基板につなげません。Google Chrome（または Microsoft Edge）を入れて、このページを開いてください'
+    : 'このブラウザでは基板につなげません。Chrome または Edge で開いてください';
   if (IS_PC) {
     document.documentElement.classList.add('pc');
     var nl = document.getElementById('note-local'); if (nl) nl.textContent = '曲はこのPCの中だけで解析します。外部へは送信しません。';
     var ob = document.querySelector('[data-out="phone"]'); if (ob) ob.textContent = 'PCのスピーカー';
+    Array.prototype.forEach.call(document.querySelectorAll('p, div, span'), function (el) {
+      if (el.children.length === 0 && el.textContent.indexOf('指を離した時') >= 0) el.textContent = el.textContent.replace('指を離した時', 'マウスを離した時');
+    });
+    // 振付の画面を左右2列に分ける（画面が狭い時は今まで通り1列に並ぶ）
+    (function () {
+      var sec = document.getElementById('scr-result'); if (!sec) return;
+      var kids = Array.prototype.slice.call(sec.children), top = kids.shift();
+      var cols = document.createElement('div'), L = document.createElement('div'), R = document.createElement('div');
+      cols.className = 'pc-cols'; L.className = R.className = 'pc-col';
+      var right = false;
+      kids.forEach(function (el) { if (el.querySelector && el.querySelector('#tl')) right = true; (right ? R : L).appendChild(el); });
+      cols.appendChild(L); cols.appendChild(R); sec.appendChild(cols);
+    })();
   }
 
   function store(key, val) { try { if (val === undefined) { var s = localStorage.getItem(key); return s ? JSON.parse(s) : null; } localStorage.setItem(key, JSON.stringify(val)); } catch (e) { return null; } }

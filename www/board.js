@@ -100,7 +100,7 @@
         await this._send([86]);   // V
         try { line = await this.waitLine('READY', k ? 1500 : 2000); } catch (e) { }
       }
-      if (!line) throw new Error('基板から返事がありません。基板プログラムが v0.9 か確かめてください');
+      if (!line) throw new Error('基板から返事がありません。基板プログラムが v0.9 以降か確かめてください');
       var p = line.split(' ');
       this.version = p[1] || ''; this.reason = p[2] || '';
       this._log('接続 ' + this.version + '（前回の起動の原因：' + this.reasonText() + '）');
