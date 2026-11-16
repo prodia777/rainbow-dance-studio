@@ -769,7 +769,8 @@
     var twT = Math.max(-0.8, Math.min(0.8, -0.35 * stickV));
     twistV += ((twT - twist) * 35 - twistV * 8) * dt; twist += twistV * dt;
     // ・反転時の「8の字」：上半分は新しい向きへ、下半分は前の向きのまま遅れて、中央で交差してくびれる
-    var t8 = Math.max(-3.1, Math.min(3.1, -0.55 * acc));
+    // メトロノームは一方向のシンプルな動きなので、急に回し始めた時のくびれ（8の字）は出さない
+    var t8 = res && res.metro ? 0 : Math.max(-3.1, Math.min(3.1, -0.55 * acc));
     tw8V += ((t8 - tw8) * 16 - tw8V * 3.4) * dt; tw8 += tw8V * dt;
     stickA += stickV * 1.6 * 2 * Math.PI * dt;
     g.clearRect(0, 0, W, H);
