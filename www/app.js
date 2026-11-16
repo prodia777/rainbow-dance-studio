@@ -290,6 +290,146 @@
     if (Board.state === 'on') ensureLoaded().catch(function (e) { bdLog(e.message, true); });
   }
   $('btn-sync-test').addEventListener('click', openSyncTest);
+  // ================= メトロノーム（球体の上下でリズムを刻む） =================
+  // 拍＝球体の下端が一番下まで「落ちきった瞬間」。拍で電気を入れて上げ、次の拍の少し前に電気を切って、拍でちょうど落ちきるようにする。
+  // 電気を切る時刻は、画面のスティックと同じ計算（上がる速さ・落ちる速さ）で、落ちきる瞬間が拍に来るように自動で求める。
+  var MT_KEY = 'rs.metro', MT = { bpm: 80, beats: 4, power: 22, click: 1, rise: 0.15, fall: 0.2 };
+  try { var mtSaved = JSON.parse(localStorage.getItem(MT_KEY) || 'null'); if (mtSaved) for (var mk in MT) if (typeof mtSaved[mk] === 'number') MT[mk] = mtSaved[mk]; } catch (e) { }
+  function mtSave() { try { localStorage.setItem(MT_KEY, JSON.stringify(MT)); } catch (e) { } }
+  var MT_K = 150, MT_C = 2 * Math.sqrt(150) * 0.85;   // メトロノームでは球体の形が回転の速さに素早く付いていく（実物は電気を切るとすぐ落ちる）
+  var MT_KICK = 26, MT_KICK_S = 0.1, MT_ACC = 4, MT_LAND = 0.2, MT_DUR = 300, MT_PRE = 1.2;
+  // 画面のスティックの計算（drawStick と同じ式）で、1回の上下をまねる。cut＝次の拍の何秒前に電気を切るか
+  function mtSimulate(pw, P, cut, rise, fall) {
+    var dt = 0.004, v = 0, shape = 0, sv = 0, land = null, peak = 0, cycles = 6, T = P * cycles;
+    var tv = function (pc) { return Math.pow(Math.min(1, pc / 35), 0.6); };
+    for (var t = 0; t < T + P; t += dt) {
+      var c = Math.floor(t / P), u = t - c * P, on = c < cycles && u < P - cut;
+      var target = on ? tv(u < MT_KICK_S ? Math.max(pw, MT_KICK) : pw) : 0;
+      var tau = target === 0 || target < v ? fall : rise;
+      v += (target - v) * (1 - Math.exp(-dt / tau));
+      sv += ((v - shape) * MT_K - sv * MT_C) * dt; shape = Math.max(0, Math.min(1.12, shape + sv * dt));
+      if (c === cycles - 1) {
+        var sp = Math.pow(Math.max(0, Math.min(1.08, (shape - 0.2) / 0.8)), 1.3); if (sp > peak) peak = sp;
+        if (land === null && u >= P - cut && shape <= MT_LAND) land = u;
+      }
+      if (c === cycles && land === null && shape <= MT_LAND) land = P + u;
+    }
+    return { err: land === null ? 9 : land - P, peak: peak };
+  }
+  // 落ちきる瞬間が拍に来る「電気を切る時刻」を探す
+  function mtSolve(pw, P) {
+    var lo = 0.04, hi = Math.max(0.05, P - 0.06), a = mtSimulate(pw, P, lo, MT.rise, MT.fall), b = mtSimulate(pw, P, hi, MT.rise, MT.fall);
+    if (a.err <= 0) return { cut: lo, ok: true, peak: a.peak, err: a.err };
+    if (b.err > 0.005) return { cut: hi, ok: false, peak: b.peak, err: b.err };
+    for (var k = 0; k < 22; k++) { var m = (lo + hi) / 2, r = mtSimulate(pw, P, m, MT.rise, MT.fall); if (r.err > 0) lo = m; else hi = m; }
+    var f = mtSimulate(pw, P, hi, MT.rise, MT.fall);
+    return { cut: hi, ok: true, peak: f.peak, err: f.err };
+  }
+  function mtPlan() {
+    var T = 60 / MT.bpm, plan = null;
+    // 1拍に1回上下できるか（落ちきって、ある程度の高さまで上がるか）。無理なら2拍に1回
+    for (var per = 1; per <= 2; per++) {
+      var P = T * per, s0 = mtSolve(MT.power, P), s1 = MT.beats > 1 ? mtSolve(MT.power + MT_ACC, P) : s0;
+      plan = { per: per, P: P, T: T, norm: s0, acc: s1 };
+      if (s0.ok && s1.ok && s0.peak >= 0.25) break;
+    }
+    return plan;
+  }
+  function openMetro() {
+    stopPlay(true);
+    var pl = mtPlan(), T = pl.T, P = pl.P, sr = 16000, ac = getCtx();
+    var nBeats = Math.floor((MT_DUR - MT_PRE) / T), DUR = MT_PRE + nBeats * T + 0.3;
+    var buf = ac.createBuffer(1, Math.ceil(DUR * sr), sr), d = buf.getChannelData(0), i, n;
+    var beats = [];
+    for (n = 0; n <= nBeats; n++) {
+      var tb = MT_PRE + n * T, acc = MT.beats > 1 && n % MT.beats === 0; beats.push({ t: tb, acc: acc });
+      if (!MT.click) continue;
+      var i0 = Math.round(tb * sr), L = Math.round(0.035 * sr), f = acc ? 1760 : 1320, g = acc ? 0.9 : 0.55;
+      for (i = 0; i < L && i0 + i < d.length; i++) d[i0 + i] = g * Math.sin(2 * Math.PI * f * i / sr) * (1 - i / L);
+    }
+    var N = Math.ceil(DUR * FPS), cmd = new Int8Array(N), strokes = 0;
+    function fill(a, b, pc) { var v = Math.trunc(A.CAP * pc / 100); for (var k = Math.max(0, Math.round(a * FPS)); k < Math.min(N, Math.round(b * FPS)); k++) cmd[k] = v; }
+    // 上下は拍子の頭（1拍目）に落ちきるようにそろえる。最初の1回は曲の始めから
+    for (n = -pl.per; n + pl.per <= nBeats; n += pl.per) {
+      var land = MT_PRE + (n + pl.per) * T, start = Math.max(0, land - P), accN = MT.beats > 1 && (n + pl.per) % MT.beats === 0;
+      var sol = accN ? pl.acc : pl.norm, pw = MT.power + (accN ? MT_ACC : 0), off = land - sol.cut + 0.02;   // 0.02：20msごとの区切りで早めに落ちる分の補正
+      if (off <= start + 0.05) continue;
+      fill(start, off, pw); fill(start, Math.min(off, start + MT_KICK_S), Math.max(pw, MT_KICK));
+      strokes++;
+    }
+    cmd[N - 1] = 0;
+    var mode = (pl.per === 1 ? '1拍に1回上下' : '2拍に1回上下（速いテンポ）') + (pl.norm.ok ? '' : '・落ちきれない時があります');
+    res = decorate({ cmd: cmd, ncut: strokes, eights: [], flips: [], scenes: [{ a: 0, b: DUR, kind: '電気を切る', weak: false, big: false }], tempo: MT.bpm, slow: false, plan: { ph: [] }, info: 'メトロノーム：' + mode, metro: { beats: beats, T: T, plan: pl, mode: mode } });
+    res.key = 'metro|' + MT.bpm + '|' + MT.beats + '|' + MT.power + '|' + MT.rise + '|' + MT.fall + '|' + res.sum;
+    song = { name: 'メトロノーム ' + MT.bpm + '拍/分' + (MT.beats > 1 ? '・' + MT.beats + '拍子' : ''), buf: buf, ch: channelDb(buf), secs: 0 };
+    playOff = 0; paused = false; mtErr = [];
+    renderResult(); show('result'); sizeTimeline(); drawTimelineBase(); mtShow();
+    if (Board.state === 'on') ensureLoaded().catch(function (e) { bdLog(e.message, true); });
+  }
+  function mtShow() {
+    $('mt-bpm').textContent = MT.bpm; $('mt-slider').value = MT.bpm;
+    $('mt-mode').textContent = res && res.metro ? res.metro.mode : '';
+    [['mt-beats', MT.beats], ['mt-power', MT.power], ['mt-click', MT.click]].forEach(function (x) {
+      Array.prototype.forEach.call($(x[0]).querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', String(+b.dataset.v === x[1])); });
+    });
+    $('mt-fall').value = MT.fall; $('mt-rise').value = MT.rise;
+    $('mt-fall-v').textContent = Math.round(MT.fall * 1000) + ' ms'; $('mt-rise-v').textContent = Math.round(MT.rise * 1000) + ' ms';
+  }
+  // 設定を変えたら作り直す（再生中なら、作り直して続ける）
+  var mtTimer = null;
+  function mtChange(now) {
+    mtSave(); mtShow();
+    clearTimeout(mtTimer);
+    mtTimer = setTimeout(function () { var was = play.on; openMetro(); if (was) startPlay(); }, now ? 0 : 350);
+  }
+  $('btn-metro').addEventListener('click', openMetro);
+  $('mt-minus').addEventListener('click', function () { MT.bpm = Math.max(40, MT.bpm - 1); mtChange(); });
+  $('mt-plus').addEventListener('click', function () { MT.bpm = Math.min(200, MT.bpm + 1); mtChange(); });
+  $('mt-slider').addEventListener('input', function (e) { MT.bpm = +e.target.value; mtSave(); mtShow(); });
+  $('mt-slider').addEventListener('change', function () { mtChange(true); });
+  var taps = [];
+  $('mt-tap').addEventListener('click', function () {
+    var t = performance.now(); if (taps.length && t - taps[taps.length - 1] > 2000) taps = [];
+    taps.push(t); if (taps.length > 6) taps.shift();
+    if (taps.length >= 3) { var iv = (taps[taps.length - 1] - taps[0]) / (taps.length - 1); MT.bpm = Math.max(40, Math.min(200, Math.round(60000 / iv))); mtChange(); }
+  });
+  [['mt-beats', 'beats'], ['mt-power', 'power'], ['mt-click', 'click']].forEach(function (x) {
+    $(x[0]).addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; MT[x[1]] = +b.dataset.v; mtChange(true); });
+  });
+  ['fall', 'rise'].forEach(function (k) {
+    $('mt-' + k).addEventListener('input', function (e) { MT[k] = +e.target.value; mtSave(); mtShow(); });
+    $('mt-' + k).addEventListener('change', function () { mtChange(true); });
+  });
+  // 再生中の「高さ」の線と拍のランプ、落ちきる瞬間と拍のずれ
+  var mtHist = [], mtErr = [], mtWasUp = false;
+  function mtFrame(pos) {
+    if (!res || !res.metro) return;
+    var M = res.metro, c = $('mt-trace'), dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (c.width !== Math.round(c.clientWidth * dpr)) { c.width = Math.round(c.clientWidth * dpr); c.height = Math.round(90 * dpr); }
+    var g = c.getContext('2d'), W = c.width, H = c.height, span = 4;
+    if (!play.on) mtHist = []; else { mtHist.push([pos, lastSp]); while (mtHist.length && mtHist[0][0] < pos - span) mtHist.shift(); }
+    // 落ちきった瞬間を見つけて、いちばん近い拍とのずれを記録
+    if (play.on) {
+      if (lastSp > 0.15) mtWasUp = true;
+      else if (mtWasUp && lastSp <= 0.001) {
+        mtWasUp = false; var k = Math.round((pos - MT_PRE) / M.T), e = (pos - (MT_PRE + k * M.T)) * 1000;
+        if (Math.abs(e) < M.T * 500) { mtErr.push(e); if (mtErr.length > 16) mtErr.shift(); var av = mtErr.reduce(function (a, b) { return a + b; }, 0) / mtErr.length; $('mt-err').textContent = '落ちきる瞬間と拍のずれ（画面）：' + (av >= 0 ? '+' : '−') + Math.abs(av).toFixed(0) + ' ms（遅れが＋）'; }
+      }
+    }
+    g.clearRect(0, 0, W, H);
+    var x0 = pos - span + 0.5, X = function (t) { return (t - x0) / span * W; };
+    for (var bi = Math.max(0, Math.floor((x0 - MT_PRE) / M.T)); bi < M.beats.length; bi++) {
+      var b = M.beats[bi]; if (b.t > x0 + span) break;
+      g.fillStyle = b.acc ? 'rgba(251,191,36,.7)' : 'rgba(255,255,255,.25)'; g.fillRect(Math.round(X(b.t)), 0, b.acc ? 2 : 1, H);
+    }
+    g.strokeStyle = '#34D399'; g.lineWidth = 2 * dpr; g.beginPath();
+    mtHist.forEach(function (h, j) { var x = X(h[0]), y = H - 6 * dpr - h[1] * (H - 12 * dpr); if (j) g.lineTo(x, y); else g.moveTo(x, y); }); g.stroke();
+    g.fillStyle = 'rgba(255,255,255,.5)'; g.fillRect(Math.round(X(pos)), 0, 1, H);
+    var lamp = $('mt-lamp'), ib = Math.round((pos - MT_PRE) / M.T), bt = MT_PRE + ib * M.T, hit = play.on && ib >= 0 && pos - bt >= 0 && pos - bt < 0.1;
+    lamp.className = 'mt-lamp' + (hit ? (M.beats[ib] && M.beats[ib].acc ? ' acc' : ' on') : '');
+  }
+
+
   $('btn-cancel').addEventListener('click', function () { cancelled = true; show(song ? 'result' : 'home'); });
 
   function makeSample(ac) {
@@ -369,6 +509,8 @@
       var d = document.createElement('div'); d.className = 'stat'; d.innerHTML = '<b>' + x[0] + '</b><span>' + x[1] + '</span>'; st.appendChild(d);
     });
     $('clock').textContent = fmt(playOff); $('clock-total').textContent = fmtShort(song.buf.duration); updateChips(playOff);
+    $('metro-card').hidden = !res.metro;
+    $('rs-title').textContent = res.metro ? 'メトロノーム' : '振付ができました';
   }
 
   // タイムライン
@@ -521,6 +663,7 @@
       play = { on: true, src: src, when: when, off: off, heard: heard, boardStart: motor, autoLat: autoLat, useBoard: useBoard };
       src.onended = function () {
         if (play.src === src && play.on && audioPos() >= song.buf.duration - 0.3) { play.on = false; playOff = 0; paused = false; setPlayIcon(false); $('chip-dir').textContent = '終了'; }
+        if (res && res.metro && !play.on && playOff === 0) startPlay();
       };
       $('sy-sig').textContent = Math.round(wait * 1000) + ' ms後・' + fmt(off) + 'から';
       $('sy-lat').textContent = Math.round(autoLat) + ' ms';
@@ -607,12 +750,13 @@
   // 仮想Rainbow Stick
   // 基板へ送る値を、絵の回転の強さへ直す。実物は弱い出力でも大きく広がるので、18%で約7割、8の字の35%で最大にする
   function stickTarget(v) { if (!v) return 0; var r = Math.min(1, Math.abs(v) / (A.CAP * 0.35)); return (v > 0 ? 1 : -1) * Math.pow(r, 0.6); }
-  var stickV = 0, stickA = 0, stickShape = 0, shapeVel = 0, twist = 0, twistV = 0, tw8 = 0, tw8V = 0;
+  var lastSp = 0, stickV = 0, stickA = 0, stickShape = 0, shapeVel = 0, twist = 0, twistV = 0, tw8 = 0, tw8V = 0;
   function drawStick(dt, target) {
     var c = $('stick'), g = c.getContext('2d'), W = c.width, H = c.height, cx = W / 2;
     var prevV = stickV;
     // 電気を切る(0)と惰性でゆっくり減速、弱めると中くらい、加速・逆転は速い
-    var tauV = target === 0 ? 0.4 : ((Math.sign(target) === Math.sign(stickV) && Math.abs(target) < Math.abs(stickV)) ? 0.4 : 0.15);
+    var fT = res && res.metro ? MT.fall : 0.4, rT = res && res.metro ? MT.rise : 0.15;
+    var tauV = target === 0 ? fT : ((Math.sign(target) === Math.sign(stickV) && Math.abs(target) < Math.abs(stickV)) ? fT : rT);
     stickV += (target - stickV) * (1 - Math.exp(-dt / tauV));
     var acc = (stickV - prevV) / Math.max(dt, 0.004);
     // フィルムの下端は自由端：回転の変化に遅れてねじれ、揺れ戻る（反転で大きくねじれる）
@@ -627,9 +771,11 @@
     var bg = g.createRadialGradient(cx, H * 0.35, 10, cx, H * 0.4, H * 0.75); bg.addColorStop(0, '#1d1f25'); bg.addColorStop(1, '#0d0e11'); g.fillStyle = bg; g.fillRect(0, 0, W, H);
     // 上端は固定。下端は軸に沿って自由に動き、速く回るほど横に広がって下端が上がる（形は速さより少し遅れて変わる）
     // 浮き上がりにも慣性（少し行き過ぎて戻る）
-    shapeVel += ((Math.abs(stickV) - stickShape) * 30 - shapeVel * 7) * dt; stickShape = Math.max(0, Math.min(1.12, stickShape + shapeVel * dt));
+    var sK = res && res.metro ? MT_K : 30, sC = res && res.metro ? MT_C : 7;
+    shapeVel += ((Math.abs(stickV) - stickShape) * sK - shapeVel * sC) * dt; stickShape = Math.max(0, Math.min(1.12, stickShape + shapeVel * dt));
     // 遠心力は回転の2乗で強くなるので、低速ではあまり膨らまず、高速で一気に上で膨らむ
     var sp = Math.pow(Math.max(0, Math.min(1.08, (stickShape - 0.2) / 0.8)), 1.3);
+    lastSp = sp;
     // フィルムの長さは一定：下端が上がった分だけ外へ膨らむ（半楺円の周長で近似）
     var yt = 34, hgt = Math.max(52, 250 - 185 * sp), yb = yt + hgt, half = hgt / 2, LS = 92;
     var Rm = Math.sqrt(Math.max(400, 2 * LS * LS - half * half));
@@ -727,7 +873,8 @@
         pos = Math.max(0, ap);
         if (bp < play.off) { updateChips(play.off, true); $('sy-board').textContent = '待機 ' + Math.round((play.off - bp) * 1000) + ' ms'; }
         else {
-          var i = Math.min(res.cmd.length - 1, Math.floor(bp * FPS)); target = stickTarget(res.cmd[i]); updateChips(bp);
+          var sp0 = res.metro ? Math.max(0, ap) : bp;
+          var i = Math.min(res.cmd.length - 1, Math.floor(sp0 * FPS)); target = stickTarget(res.cmd[i]); updateChips(bp);
           $('sy-board').textContent = fmt(bp);
         }
         $('sy-audio').textContent = ap < play.off ? '— 音が出る前' : fmt(ap);
@@ -740,6 +887,7 @@
       }
       drawStick(dt, target);
       drawTimeline(pos);
+      mtFrame(pos);
     }
     requestAnimationFrame(frame);
   }
